@@ -1,12 +1,14 @@
 import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../supabase'
-import type { Exercise } from '../types'
 
-interface SetData {
-  exercise_id: string
-  weight: number
-  reps: number
-  workout_completed_at: string
+interface WorkoutExerciseRow {
+  id: string
+  exercise_id: string | null
+  exercise_name_snapshot: string
+  muscle_group_snapshot: string
+  workout_id: string
+  workout_sets: { weight_kg: number; reps: number }[]
+  workouts: { completed_at: string }
 }
 
 interface WeekData {
@@ -17,8 +19,7 @@ interface WeekData {
 }
 
 export default function Analytics() {
-  const [exercises, setExercises] = useState<Exercise[]>([])
-  const [setData, setSetData] = useState<SetData[]>([])
+  const [rows, setRows] = useState<WorkoutExerciseRow[]>([])
   const [weeklyData, setWeeklyData] = useState<WeekData[]>([])
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -28,11 +29,10 @@ export default function Analytics() {
   }, [])
 
   async function loadData() {
-    const [exercisesRes, setsRes, workoutsRes] = await Promise.all([
-      supabase.from('exercises').select('*').order('name'),
+    const [weRes, workoutsRes] = await Promise.all([
       supabase
-        .from('workout_sets')
-        .select('exercise_id, weight, reps, created_at, workouts!inner(completed_at)')
+        .from('workout_exercises')
+        .select('id, exercise_id, exercise_name_snapshot, muscle_group_snapshot, workout_id, workout_sets(weight_kg, reps), workouts!inner(completed_at)')
         .not('workouts.completed_at', 'is', null)
         .order('created_at', { ascending: true }),
       supabase
@@ -42,23 +42,25 @@ export default function Analytics() {
         .order('completed_at', { ascending: true }),
     ])
 
-    if (exercisesRes.data) setExercises(exercisesRes.data)
-
-    if (setsRes.data) {
-      const mapped = setsRes.data.map((s: Record<string, unknown>) => ({
-        exercise_id: s.exercise_id as string,
-        weight: s.weight as number,
-        reps: s.reps as number,
-        workout_completed_at: (s.workouts as { completed_at: string }).completed_at,
+    if (weRes.data) {
+      const mapped = weRes.data.map((r: Record<string, unknown>) => ({
+        id: r.id as string,
+        exercise_id: r.exercise_id as string | null,
+        exercise_name_snapshot: r.exercise_name_snapshot as string,
+        muscle_group_snapshot: r.muscle_group_snapshot as string,
+        workout_id: r.workout_id as string,
+        workout_sets: r.workout_sets as { weight_kg: number; reps: number }[],
+        workouts: r.workouts as { completed_at: string },
       }))
-      setSetData(mapped)
+      setRows(mapped)
 
       if (mapped.length > 0) {
         const exerciseCounts = new Map<string, number>()
-        for (const s of mapped) {
-          exerciseCounts.set(s.exercise_id, (exerciseCounts.get(s.exercise_id) || 0) + 1)
+        for (const r of mapped) {
+          const key = r.exercise_id || r.exercise_name_snapshot
+          exerciseCounts.set(key, (exerciseCounts.get(key) || 0) + r.workout_sets.length)
         }
-        let mostUsed = mapped[0].exercise_id
+        let mostUsed = mapped[0].exercise_id || mapped[0].exercise_name_snapshot
         let maxCount = 0
         for (const [id, count] of exerciseCounts) {
           if (count > maxCount) {
@@ -70,8 +72,8 @@ export default function Analytics() {
       }
     }
 
-    if (workoutsRes.data && setsRes.data) {
-      setWeeklyData(buildWeeklyData(workoutsRes.data, setsRes.data))
+    if (workoutsRes.data && weRes.data) {
+      setWeeklyData(buildWeeklyData(workoutsRes.data, weRes.data as unknown as WorkoutExerciseRow[]))
     }
 
     setLoading(false)
@@ -79,7 +81,7 @@ export default function Analytics() {
 
   function buildWeeklyData(
     workouts: { completed_at: string | null }[],
-    sets: Record<string, unknown>[]
+    exerciseRows: WorkoutExerciseRow[]
   ): WeekData[] {
     const weekMap = new Map<string, { count: number; volume: number }>()
 
@@ -91,12 +93,14 @@ export default function Analytics() {
       weekMap.set(weekKey, existing)
     }
 
-    for (const s of sets) {
-      const workoutData = s.workouts as { completed_at: string } | null
-      if (!workoutData?.completed_at) continue
-      const weekKey = getWeekKey(new Date(workoutData.completed_at))
+    for (const r of exerciseRows) {
+      const completedAt = (r.workouts as { completed_at: string })?.completed_at
+      if (!completedAt) continue
+      const weekKey = getWeekKey(new Date(completedAt))
       const existing = weekMap.get(weekKey) || { count: 0, volume: 0 }
-      existing.volume += (s.weight as number) * (s.reps as number)
+      for (const s of r.workout_sets) {
+        existing.volume += s.weight_kg * s.reps
+      }
       weekMap.set(weekKey, existing)
     }
 
@@ -116,42 +120,57 @@ export default function Analytics() {
     return d.toISOString().slice(0, 10)
   }
 
+  const exerciseOptions = useMemo(() => {
+    const map = new Map<string, { key: string; name: string; group: string }>()
+    for (const r of rows) {
+      const key = r.exercise_id || r.exercise_name_snapshot
+      if (!map.has(key)) {
+        map.set(key, { key, name: r.exercise_name_snapshot, group: r.muscle_group_snapshot })
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [rows])
+
   const exerciseProgress = useMemo(() => {
     if (!selectedExercise) return []
-    const relevant = setData.filter((s) => s.exercise_id === selectedExercise)
+    const relevant = rows.filter(
+      (r) => (r.exercise_id || r.exercise_name_snapshot) === selectedExercise
+    )
 
     const bySession = new Map<string, { maxWeight: number; date: string }>()
-    for (const s of relevant) {
-      const dateKey = s.workout_completed_at.slice(0, 10)
-      const existing = bySession.get(dateKey)
-      if (!existing || s.weight > existing.maxWeight) {
-        bySession.set(dateKey, { maxWeight: s.weight, date: dateKey })
+    for (const r of relevant) {
+      const dateKey = r.workouts.completed_at.slice(0, 10)
+      for (const s of r.workout_sets) {
+        const existing = bySession.get(dateKey)
+        if (!existing || s.weight_kg > existing.maxWeight) {
+          bySession.set(dateKey, { maxWeight: s.weight_kg, date: dateKey })
+        }
       }
     }
 
     return Array.from(bySession.values()).sort((a, b) => a.date.localeCompare(b.date))
-  }, [selectedExercise, setData])
-
-  const exercisesWithData = useMemo(() => {
-    const ids = new Set(setData.map((s) => s.exercise_id))
-    return exercises.filter((e) => ids.has(e.id))
-  }, [exercises, setData])
+  }, [selectedExercise, rows])
 
   const personalBests = useMemo(() => {
-    const maxByExercise = new Map<string, number>()
-    for (const s of setData) {
-      const current = maxByExercise.get(s.exercise_id) || 0
-      if (s.weight > current) maxByExercise.set(s.exercise_id, s.weight)
+    const maxByExercise = new Map<string, { name: string; group: string; weight: number }>()
+    for (const r of rows) {
+      const key = r.exercise_id || r.exercise_name_snapshot
+      for (const s of r.workout_sets) {
+        const existing = maxByExercise.get(key)
+        if (!existing || s.weight_kg > existing.weight) {
+          maxByExercise.set(key, {
+            name: r.exercise_name_snapshot,
+            group: r.muscle_group_snapshot,
+            weight: s.weight_kg,
+          })
+        }
+      }
     }
-    const exerciseMap = new Map(exercises.map((e) => [e.id, e]))
     return Array.from(maxByExercise.entries())
-      .map(([id, weight]) => {
-        const ex = exerciseMap.get(id)
-        return { exerciseId: id, name: ex?.name || 'Unknown', group: ex?.muscle_group || '', weight }
-      })
+      .map(([key, data]) => ({ key, ...data }))
       .sort((a, b) => b.weight - a.weight)
       .slice(0, 10)
-  }, [setData, exercises])
+  }, [rows])
 
   if (loading) {
     return (
@@ -161,7 +180,7 @@ export default function Analytics() {
     )
   }
 
-  const hasData = setData.length > 0
+  const hasData = rows.length > 0
 
   return (
     <div className="px-5 pt-12 pb-6">
@@ -219,8 +238,8 @@ export default function Analytics() {
               onChange={(e) => setSelectedExercise(e.target.value)}
               className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm mb-3 focus:outline-none focus:border-green-600 appearance-none"
             >
-              {exercisesWithData.map((e) => (
-                <option key={e.id} value={e.id}>{e.name}</option>
+              {exerciseOptions.map((e) => (
+                <option key={e.key} value={e.key}>{e.name}</option>
               ))}
             </select>
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
@@ -243,7 +262,7 @@ export default function Analytics() {
             </h2>
             <div className="space-y-2">
               {personalBests.map((pb) => (
-                <div key={pb.exerciseId} className="flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl">
+                <div key={pb.key} className="flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl">
                   <div>
                     <p className="text-sm font-medium text-white">{pb.name}</p>
                     <p className="text-[10px] text-slate-500 uppercase">{pb.group}</p>

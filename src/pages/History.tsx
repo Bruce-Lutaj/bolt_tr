@@ -15,16 +15,17 @@ export default function History() {
   async function loadWorkouts() {
     const { data } = await supabase
       .from('workouts')
-      .select('*, workout_sets(id)')
+      .select('*, workout_exercises(workout_sets(id))')
       .not('completed_at', 'is', null)
       .order('completed_at', { ascending: false })
 
     if (data) {
       setWorkouts(
-        data.map((w) => ({
-          ...w,
-          setCount: Array.isArray(w.workout_sets) ? w.workout_sets.length : 0,
-        }))
+        data.map((w) => {
+          const exs = w.workout_exercises as { workout_sets: { id: string }[] }[] | undefined
+          const setCount = exs ? exs.reduce((sum, we) => sum + we.workout_sets.length, 0) : 0
+          return { ...w, setCount }
+        })
       )
     }
     setLoading(false)

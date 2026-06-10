@@ -29,6 +29,7 @@ export default function NewWorkout() {
     supabase
       .from('exercises')
       .select('*')
+      .is('archived_at', null)
       .order('muscle_group')
       .order('name')
       .then(({ data }) => {
@@ -93,10 +94,11 @@ export default function NewWorkout() {
     setSaving(true)
 
     const name = workoutName.trim() || `Workout ${new Date().toLocaleDateString()}`
+    const now = new Date().toISOString()
 
     const { data: workout, error: workoutErr } = await supabase
       .from('workouts')
-      .insert({ name, completed_at: new Date().toISOString() })
+      .insert({ name, started_at: now, completed_at: now })
       .select()
       .single()
 
@@ -105,17 +107,35 @@ export default function NewWorkout() {
       return
     }
 
-    const sets = entries.flatMap((entry) =>
-      entry.sets
+    const workoutExercises = entries.map((entry, idx) => ({
+      workout_id: workout.id,
+      exercise_id: entry.exercise.id,
+      exercise_name_snapshot: entry.exercise.name,
+      muscle_group_snapshot: entry.exercise.muscle_group,
+      position: idx + 1,
+    }))
+
+    const { data: insertedExercises, error: exErr } = await supabase
+      .from('workout_exercises')
+      .insert(workoutExercises)
+      .select()
+
+    if (exErr || !insertedExercises) {
+      setSaving(false)
+      return
+    }
+
+    const sets = entries.flatMap((entry, entryIdx) => {
+      const workoutExercise = insertedExercises[entryIdx]
+      return entry.sets
         .filter((s) => s.reps !== '' && s.weight !== '')
         .map((s, idx) => ({
-          workout_id: workout.id,
-          exercise_id: entry.exercise.id,
+          workout_exercise_id: workoutExercise.id,
           set_number: idx + 1,
-          reps: parseInt(s.reps) || 0,
-          weight: parseFloat(s.weight) || 0,
+          reps: parseInt(s.reps) || 1,
+          weight_kg: parseFloat(s.weight) || 0,
         }))
-    )
+    })
 
     if (sets.length > 0) {
       await supabase.from('workout_sets').insert(sets)

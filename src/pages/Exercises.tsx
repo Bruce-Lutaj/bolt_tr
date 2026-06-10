@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, X, Search } from 'lucide-react'
+import { Plus, X, Search, Archive } from 'lucide-react'
 import { supabase } from '../supabase'
 import type { Exercise } from '../types'
 
@@ -22,6 +22,7 @@ export default function Exercises() {
     const { data } = await supabase
       .from('exercises')
       .select('*')
+      .is('archived_at', null)
       .order('muscle_group')
       .order('name')
     if (data) setExercises(data)
@@ -33,7 +34,7 @@ export default function Exercises() {
     setAdding(true)
     const { data, error } = await supabase
       .from('exercises')
-      .insert({ name: newName.trim(), muscle_group: newGroup })
+      .insert({ name: newName.trim(), muscle_group: newGroup, is_custom: true })
       .select()
       .single()
     if (!error && data) {
@@ -42,6 +43,16 @@ export default function Exercises() {
       setShowAdd(false)
     }
     setAdding(false)
+  }
+
+  async function archiveExercise(id: string) {
+    const { error } = await supabase
+      .from('exercises')
+      .update({ archived_at: new Date().toISOString() })
+      .eq('id', id)
+    if (!error) {
+      setExercises(exercises.filter((e) => e.id !== id))
+    }
   }
 
   const filtered = exercises.filter(
@@ -98,9 +109,21 @@ export default function Exercises() {
                 {exs.map((ex) => (
                   <div
                     key={ex.id}
-                    className="px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-sm text-white"
+                    className="flex items-center justify-between px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg"
                   >
-                    {ex.name}
+                    <div>
+                      <span className="text-sm text-white">{ex.name}</span>
+                      {ex.is_custom && (
+                        <span className="ml-2 text-[9px] text-green-500 font-medium uppercase">Custom</span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => archiveExercise(ex.id)}
+                      className="p-1.5 text-slate-600 hover:text-amber-400 transition-colors"
+                      title="Archive exercise"
+                    >
+                      <Archive size={14} />
+                    </button>
                   </div>
                 ))}
               </div>

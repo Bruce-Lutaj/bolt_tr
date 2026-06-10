@@ -31,13 +31,13 @@ export default function Home() {
         .gte('completed_at', weekAgo.toISOString()),
       supabase
         .from('workout_sets')
-        .select('reps, weight'),
+        .select('reps, weight_kg'),
     ])
 
     if (workoutsRes.data) setRecentWorkouts(workoutsRes.data)
 
     const totalVolume = volumeRes.data
-      ? volumeRes.data.reduce((sum, s) => sum + s.reps * s.weight, 0)
+      ? volumeRes.data.reduce((sum, s) => sum + s.reps * s.weight_kg, 0)
       : 0
 
     setStats({
