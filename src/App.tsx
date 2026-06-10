@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import BottomNav from './components/BottomNav'
 import Home from './pages/Home'
 import NewWorkout from './pages/NewWorkout'
+import Analytics from './pages/Analytics'
 import History from './pages/History'
 import WorkoutDetail from './pages/WorkoutDetail'
 import Exercises from './pages/Exercises'
@@ -13,6 +14,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/workout" element={<NewWorkout />} />
+          <Route path="/progress" element={<Analytics />} />
           <Route path="/history" element={<History />} />
           <Route path="/history/:id" element={<WorkoutDetail />} />
           <Route path="/exercises" element={<Exercises />} />
