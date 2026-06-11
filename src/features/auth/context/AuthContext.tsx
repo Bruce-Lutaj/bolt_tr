@@ -5,6 +5,7 @@ import {
   smartUserLogin as suLogin,
   smartUserSignup as suSignup,
   smartUserLogout as suLogout,
+  validateSmartUserSession,
   getSmartUserSession,
 } from '../api/smartUserAuthApi'
 import type { User } from '@supabase/supabase-js'
@@ -63,18 +64,40 @@ export function AuthProviderComponent({ children }: { children: ReactNode }) {
     if (savedMode === 'smartuser') {
       const session = getSmartUserSession()
       if (session) {
-        return {
-          user: { id: session.userId, email: session.email, displayName: null, provider: 'smartuser' },
-          loading: false,
-          isGuest: false,
-          provider: 'smartuser',
-        }
+        // Start loading — session will be validated in useEffect
+        return { user: null, loading: true, isGuest: false, provider: 'smartuser' }
       }
       localStorage.removeItem(AUTH_MODE_KEY)
     }
     return { user: null, loading: true, isGuest: false, provider: null }
   })
 
+  // Validate SmartUser session on mount
+  useEffect(() => {
+    const savedMode = localStorage.getItem(AUTH_MODE_KEY)
+    if (savedMode !== 'smartuser') return
+
+    let ignore = false
+
+    validateSmartUserSession().then(({ valid, session }) => {
+      if (ignore) return
+      if (valid && session) {
+        setState({
+          user: { id: session.userId, email: session.email, displayName: null, provider: 'smartuser' },
+          loading: false,
+          isGuest: false,
+          provider: 'smartuser',
+        })
+      } else {
+        localStorage.removeItem(AUTH_MODE_KEY)
+        setState({ user: null, loading: false, isGuest: false, provider: null })
+      }
+    })
+
+    return () => { ignore = true }
+  }, [])
+
+  // Supabase auth listener
   useEffect(() => {
     if (state.isGuest || state.provider === 'smartuser') return
 

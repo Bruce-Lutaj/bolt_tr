@@ -7,6 +7,7 @@ export interface SmartUserSessionData {
   userId: string
   email: string
   token?: string
+  expiresAt?: string
 }
 
 function readSession(): SmartUserSessionData | null {
@@ -25,6 +26,19 @@ function writeSession(session: SmartUserSessionData): void {
 
 function clearSession(): void {
   localStorage.removeItem(SESSION_KEY)
+}
+
+async function safeParseJson(response: Response): Promise<{ data: Record<string, unknown> | null; parseError: string | null }> {
+  const text = await response.text()
+  if (!text || text.trim().length === 0) {
+    return { data: null, parseError: 'Empty response from server' }
+  }
+  try {
+    const parsed = JSON.parse(text)
+    return { data: parsed, parseError: null }
+  } catch {
+    return { data: null, parseError: 'Invalid JSON response from server' }
+  }
 }
 
 async function callEdgeFunction(
@@ -47,18 +61,28 @@ async function callEdgeFunction(
     return { data: null, error: err instanceof Error ? err.message : 'Network error' }
   }
 
-  const json = await response.json()
+  const { data: json, parseError } = await safeParseJson(response)
 
-  if (!response.ok) {
-    return { data: null, error: json.error ?? `Request failed (${response.status})` }
+  if (parseError) {
+    return { data: null, error: parseError }
   }
 
-  if (!json.userId) {
+  if (!response.ok) {
+    const errMsg = (json?.error as string) ?? `Request failed (${response.status})`
+    return { data: null, error: errMsg }
+  }
+
+  if (!json?.userId) {
     return { data: null, error: 'Server did not return a valid user identity' }
   }
 
   return {
-    data: { userId: json.userId, email: json.email, token: json.token },
+    data: {
+      userId: json.userId as string,
+      email: (json.email as string) ?? '',
+      token: (json.token as string) ?? undefined,
+      expiresAt: (json.expiresAt as string) ?? undefined,
+    },
     error: null,
   }
 }
@@ -87,7 +111,68 @@ export async function smartUserSignup(
   return { userId: data.userId, error: null }
 }
 
+export async function validateSmartUserSession(): Promise<{ valid: boolean; session: SmartUserSessionData | null }> {
+  const session = readSession()
+  if (!session || !session.token) {
+    clearSession()
+    return { valid: false, session: null }
+  }
+
+  const url = `${SUPABASE_URL}/functions/v1/smartuser-session`
+
+  let response: Response
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ token: session.token }),
+    })
+  } catch {
+    clearSession()
+    return { valid: false, session: null }
+  }
+
+  if (!response.ok) {
+    clearSession()
+    return { valid: false, session: null }
+  }
+
+  const { data: json, parseError } = await safeParseJson(response)
+  if (parseError || !json?.userId) {
+    clearSession()
+    return { valid: false, session: null }
+  }
+
+  const refreshed: SmartUserSessionData = {
+    userId: json.userId as string,
+    email: (json.email as string) ?? session.email,
+    token: (json.token as string) ?? session.token,
+    expiresAt: (json.expiresAt as string) ?? undefined,
+  }
+  writeSession(refreshed)
+  return { valid: true, session: refreshed }
+}
+
 export async function smartUserLogout(): Promise<void> {
+  const session = readSession()
+  if (session?.token) {
+    const url = `${SUPABASE_URL}/functions/v1/smartuser-logout`
+    try {
+      await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ token: session.token }),
+      })
+    } catch {
+      // Best-effort: clear local session regardless
+    }
+  }
   clearSession()
 }
 
