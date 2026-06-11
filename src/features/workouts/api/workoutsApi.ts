@@ -3,9 +3,13 @@ import { getCurrentUserId } from '../../auth/api/authApi'
 import type { Workout, WorkoutWithExercises, DraftExercise } from '../types'
 
 export async function fetchRecentWorkouts(limit = 3): Promise<{ data: Workout[] | null; error: string | null }> {
+  const accountId = await getCurrentUserId()
+  if (!accountId) return { data: null, error: 'Not authenticated' }
+
   const { data, error } = await supabase
     .from('workouts')
     .select('*')
+    .eq('account_id', accountId)
     .not('completed_at', 'is', null)
     .order('completed_at', { ascending: false })
     .limit(limit)
@@ -14,28 +18,40 @@ export async function fetchRecentWorkouts(limit = 3): Promise<{ data: Workout[] 
 }
 
 export async function fetchTotalWorkoutCount(): Promise<{ data: number; error: string | null }> {
+  const accountId = await getCurrentUserId()
+  if (!accountId) return { data: 0, error: 'Not authenticated' }
+
   const { count, error } = await supabase
     .from('workouts')
     .select('id', { count: 'exact', head: true })
+    .eq('account_id', accountId)
     .not('completed_at', 'is', null)
 
   return { data: count ?? 0, error: error?.message ?? null }
 }
 
 export async function fetchWeeklyWorkoutCount(): Promise<{ data: number; error: string | null }> {
+  const accountId = await getCurrentUserId()
+  if (!accountId) return { data: 0, error: 'Not authenticated' }
+
   const weekAgo = new Date()
   weekAgo.setDate(weekAgo.getDate() - 7)
 
   const { count, error } = await supabase
     .from('workouts')
     .select('id', { count: 'exact', head: true })
+    .eq('account_id', accountId)
     .not('completed_at', 'is', null)
     .gte('completed_at', weekAgo.toISOString())
 
   return { data: count ?? 0, error: error?.message ?? null }
 }
 
+// Volume queried from workout_sets -- no account_id column; RLS scopes via grandparent workout.
 export async function fetchTotalVolume(): Promise<{ data: number; error: string | null }> {
+  const accountId = await getCurrentUserId()
+  if (!accountId) return { data: 0, error: 'Not authenticated' }
+
   const { data, error } = await supabase
     .from('workout_sets')
     .select('reps, weight_kg')
@@ -47,10 +63,14 @@ export async function fetchTotalVolume(): Promise<{ data: number; error: string 
 }
 
 export async function fetchWorkoutById(id: string): Promise<{ data: WorkoutWithExercises | null; error: string | null }> {
+  const accountId = await getCurrentUserId()
+  if (!accountId) return { data: null, error: 'Not authenticated' }
+
   const { data, error } = await supabase
     .from('workouts')
     .select('*, workout_exercises(*, workout_sets(*))')
     .eq('id', id)
+    .eq('account_id', accountId)
     .maybeSingle()
 
   return { data: data as WorkoutWithExercises | null, error: error?.message ?? null }
@@ -64,7 +84,11 @@ interface RepeatExerciseRow {
   workout_sets: { set_number: number; reps: number; weight_kg: number }[]
 }
 
+// workout_exercises RLS scopes through parent workout ownership.
 export async function fetchWorkoutForRepeat(workoutId: string): Promise<{ data: RepeatExerciseRow[] | null; error: string | null }> {
+  const accountId = await getCurrentUserId()
+  if (!accountId) return { data: null, error: 'Not authenticated' }
+
   const { data, error } = await supabase
     .from('workout_exercises')
     .select('exercise_id, exercise_name_snapshot, muscle_group_snapshot, position, workout_sets(set_number, reps, weight_kg)')
@@ -82,9 +106,13 @@ interface WorkoutRow {
 }
 
 export async function fetchAllWorkoutsWithSets(): Promise<{ data: { id: string; completed_at: string; exerciseCount: number; setCount: number; volume: number; name: string }[] | null; error: string | null }> {
+  const accountId = await getCurrentUserId()
+  if (!accountId) return { data: null, error: 'Not authenticated' }
+
   const { data, error } = await supabase
     .from('workouts')
     .select('*, workout_exercises(id, workout_sets(reps, weight_kg))')
+    .eq('account_id', accountId)
     .not('completed_at', 'is', null)
     .order('completed_at', { ascending: false })
 
@@ -174,6 +202,9 @@ export async function createWorkout(name: string, startedAt: string, entries: Dr
 }
 
 export async function deleteWorkout(id: string): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('workouts').delete().eq('id', id)
+  const accountId = await getCurrentUserId()
+  if (!accountId) return { error: 'Not authenticated' }
+
+  const { error } = await supabase.from('workouts').delete().eq('id', id).eq('account_id', accountId)
   return { error: error?.message ?? null }
 }

@@ -9,6 +9,11 @@ export interface AuthUser {
   displayName: string | null
 }
 
+export interface SignupResult {
+  error: string | null
+  needsConfirmation: boolean
+}
+
 interface AuthState {
   user: AuthUser | null
   loading: boolean
@@ -16,7 +21,7 @@ interface AuthState {
 
 interface AuthContextValue extends AuthState {
   login: (email: string, password: string) => Promise<string | null>
-  signup: (email: string, password: string, displayName?: string) => Promise<string | null>
+  signup: (email: string, password: string, displayName?: string) => Promise<SignupResult>
   logout: () => Promise<void>
 }
 
@@ -57,9 +62,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return error
   }, [])
 
-  const signup = useCallback(async (email: string, password: string, displayName?: string): Promise<string | null> => {
-    const { error } = await signUp(email, password, displayName)
-    return error
+  const signup = useCallback(async (email: string, password: string, displayName?: string): Promise<SignupResult> => {
+    const { session, error } = await signUp(email, password, displayName)
+    if (error) return { error, needsConfirmation: false }
+    if (!session) return { error: null, needsConfirmation: true }
+    return { error: null, needsConfirmation: false }
   }, [])
 
   const logout = useCallback(async () => {

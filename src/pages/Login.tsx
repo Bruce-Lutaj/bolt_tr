@@ -12,23 +12,33 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [infoMessage, setInfoMessage] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    setInfoMessage(null)
     setSubmitting(true)
 
-    const result = mode === 'login'
-      ? await login(email, password)
-      : await signup(email, password, displayName.trim() || undefined)
-
-    setSubmitting(false)
-
-    if (result) {
-      setError(result)
+    if (mode === 'login') {
+      const err = await login(email, password)
+      setSubmitting(false)
+      if (err) {
+        setError(err)
+      } else {
+        navigate(ROUTES.home, { replace: true })
+      }
     } else {
-      navigate(ROUTES.home, { replace: true })
+      const result = await signup(email, password, displayName.trim() || undefined)
+      setSubmitting(false)
+      if (result.error) {
+        setError(result.error)
+      } else if (result.needsConfirmation) {
+        setInfoMessage('Check your email to confirm your account.')
+      } else {
+        navigate(ROUTES.home, { replace: true })
+      }
     }
   }
 
@@ -90,6 +100,12 @@ export default function Login() {
             </div>
           )}
 
+          {infoMessage && (
+            <div className="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+              <p className="text-green-400 text-xs">{infoMessage}</p>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={submitting}
@@ -112,6 +128,7 @@ export default function Login() {
             onClick={() => {
               setMode(mode === 'login' ? 'signup' : 'login')
               setError(null)
+              setInfoMessage(null)
             }}
             className="text-sm text-slate-400 hover:text-green-400 transition-colors"
           >

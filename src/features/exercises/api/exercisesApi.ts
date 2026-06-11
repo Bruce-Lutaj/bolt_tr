@@ -3,17 +3,25 @@ import { getCurrentUserId } from '../../auth/api/authApi'
 import type { Exercise } from '../types'
 
 export async function fetchAllExercises(): Promise<{ data: Exercise[] | null; error: string | null }> {
+  const accountId = await getCurrentUserId()
+  if (!accountId) return { data: null, error: 'Not authenticated' }
+
   const { data, error } = await supabase
     .from('exercises')
     .select('*')
     .is('archived_at', null)
+    .or(`account_id.is.null,account_id.eq.${accountId}`)
     .order('muscle_group')
     .order('name')
 
   return { data, error: error?.message ?? null }
 }
 
+// Recent exercises scoped via workout_exercises RLS (parent workout ownership).
 export async function fetchRecentExercises(limit = 20): Promise<{ data: Exercise[] | null; error: string | null }> {
+  const accountId = await getCurrentUserId()
+  if (!accountId) return { data: null, error: 'Not authenticated' }
+
   const { data, error } = await supabase
     .from('workout_exercises')
     .select('exercise_id, exercises!inner(*)')
@@ -52,10 +60,14 @@ export async function createExercise(name: string, muscleGroup: string): Promise
 }
 
 export async function archiveExercise(id: string): Promise<{ error: string | null }> {
+  const accountId = await getCurrentUserId()
+  if (!accountId) return { error: 'Not authenticated' }
+
   const { error } = await supabase
     .from('exercises')
     .update({ archived_at: new Date().toISOString() })
     .eq('id', id)
+    .eq('account_id', accountId)
 
   return { error: error?.message ?? null }
 }
