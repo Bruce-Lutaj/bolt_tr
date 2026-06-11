@@ -5,6 +5,7 @@ export const ROUTES = {
   history: '/history',
   workoutDetail: (id: string) => `/history/${id}`,
   exercises: '/exercises',
+  login: '/login',
 } as const
 
 export interface NavItem {

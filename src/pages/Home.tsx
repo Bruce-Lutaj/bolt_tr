@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Dumbbell, TrendingUp, Calendar, Flame, Play, ChevronRight, RotateCcw } from 'lucide-react'
+import { Dumbbell, TrendingUp, Calendar, Flame, Play, ChevronRight, RotateCcw, LogOut } from 'lucide-react'
 import { useHomeStats, useRepeatWorkout, useElapsedTime, getDraftSummary } from '../features/workouts'
+import { useAuth } from '../features/auth'
 import { ROUTES } from '../shared/routes'
 import { formatDate, formatVolume } from '../shared/formatters'
 import { LoadingSpinner, StatCard, EmptyState, InlineError } from '../components/ui'
@@ -9,14 +10,24 @@ import { LoadingSpinner, StatCard, EmptyState, InlineError } from '../components
 export default function Home() {
   const { recentWorkouts, stats, loading, error } = useHomeStats()
   const { repeat } = useRepeatWorkout()
+  const { logout } = useAuth()
   const [draftSummary] = useState(getDraftSummary())
   const elapsed = useElapsedTime(draftSummary?.startedAt ?? null)
 
   return (
     <div className="px-5 pt-10 pb-6">
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold text-white">GymTrack</h1>
-        <p className="text-slate-500 text-sm mt-0.5">Your personal workout companion</p>
+      <header className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white">GymTrack</h1>
+          <p className="text-slate-500 text-sm mt-0.5">Your personal workout companion</p>
+        </div>
+        <button
+          onClick={logout}
+          className="p-2 text-slate-500 hover:text-slate-300 transition-colors rounded-lg hover:bg-slate-800"
+          title="Sign out"
+        >
+          <LogOut size={18} />
+        </button>
       </header>
 
       <InlineError error={error} className="mb-4" />
