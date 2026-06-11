@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Dumbbell, TrendingUp, Calendar, Flame, Play, ChevronRight, RotateCcw, LogOut } from 'lucide-react'
 import { useHomeStats, useRepeatWorkout, useElapsedTime, getDraftSummary } from '../features/workouts'
@@ -8,10 +7,10 @@ import { formatDate, formatVolume } from '../shared/formatters'
 import { LoadingSpinner, StatCard, EmptyState, InlineError } from '../components/ui'
 
 export default function Home() {
+  const { user, logout } = useAuth()
   const { recentWorkouts, stats, loading, error } = useHomeStats()
-  const { repeat } = useRepeatWorkout()
-  const { logout } = useAuth()
-  const [draftSummary] = useState(getDraftSummary())
+  const { repeat } = useRepeatWorkout(user!.id)
+  const draftSummary = getDraftSummary(user!.id)
   const elapsed = useElapsedTime(draftSummary?.startedAt ?? null)
 
   return (
@@ -19,7 +18,9 @@ export default function Home() {
       <header className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-white">GymTrack</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Your personal workout companion</p>
+          <p className="text-slate-500 text-sm mt-0.5">
+            {user?.displayName || user?.email}
+          </p>
         </div>
         <button
           onClick={logout}

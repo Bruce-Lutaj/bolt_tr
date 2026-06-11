@@ -1,4 +1,5 @@
 import { supabase } from '../../../lib/supabase/client'
+import { getCurrentUserId } from '../../auth/api/authApi'
 import type { Workout, WorkoutWithExercises, DraftExercise } from '../types'
 
 export async function fetchRecentWorkouts(limit = 3): Promise<{ data: Workout[] | null; error: string | null }> {
@@ -112,11 +113,16 @@ export async function createWorkout(name: string, startedAt: string, entries: Dr
     return { data: null, error: 'No valid sets to save' }
   }
 
+  const accountId = await getCurrentUserId()
+  if (!accountId) {
+    return { data: null, error: 'Not authenticated' }
+  }
+
   const now = new Date().toISOString()
 
   const { data: workout, error: workoutErr } = await supabase
     .from('workouts')
-    .insert({ name, started_at: startedAt, completed_at: now })
+    .insert({ name, started_at: startedAt, completed_at: now, account_id: accountId })
     .select()
     .single()
 

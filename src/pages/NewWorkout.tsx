@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { Plus, Trash2, Check, X, Timer, Copy } from 'lucide-react'
 import { useActiveWorkoutDraft, useElapsedTime } from '../features/workouts'
+import { useAuth } from '../features/auth'
 import { ExercisePicker } from '../features/exercises'
 import { InlineError } from '../components/ui'
 
 export default function NewWorkout() {
+  const { user } = useAuth()
   const {
     state,
     validSetCount,
@@ -17,7 +19,7 @@ export default function NewWorkout() {
     copyPreviousSet,
     discard,
     finish,
-  } = useActiveWorkoutDraft()
+  } = useActiveWorkoutDraft(user!.id)
   const elapsed = useElapsedTime(state.startedAt || null)
   const [showPicker, setShowPicker] = useState(false)
   const [saving, setSaving] = useState(false)

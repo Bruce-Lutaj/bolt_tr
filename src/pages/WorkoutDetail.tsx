@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Trash2, RotateCcw } from 'lucide-react'
 import { useWorkoutDetail, useRepeatWorkout, calculateTotalVolume, calculateTotalSets, deleteWorkout } from '../features/workouts'
+import { useAuth } from '../features/auth'
 import { ROUTES } from '../shared/routes'
 import { formatDateLong, formatVolume } from '../shared/formatters'
 import { LoadingSpinner, InlineError } from '../components/ui'
@@ -9,8 +10,9 @@ import { LoadingSpinner, InlineError } from '../components/ui'
 export default function WorkoutDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const { workout, loading, error } = useWorkoutDetail(id)
-  const { repeat } = useRepeatWorkout()
+  const { repeat } = useRepeatWorkout(user!.id)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 

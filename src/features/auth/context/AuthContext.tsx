@@ -1,87 +1,69 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
-import { smartUser, initSmartUser } from '../../../lib/smartuser/client'
+import { supabase } from '../../../lib/supabase/client'
+import { signUp, signIn, signOut } from '../api/authApi'
+import type { User } from '@supabase/supabase-js'
+
+export interface AuthUser {
+  id: string
+  email: string
+  displayName: string | null
+}
 
 interface AuthState {
-  isLoggedIn: boolean
+  user: AuthUser | null
   loading: boolean
-  error: string | null
 }
 
 interface AuthContextValue extends AuthState {
   login: (email: string, password: string) => Promise<string | null>
-  signup: (email: string, password: string) => Promise<string | null>
+  signup: (email: string, password: string, displayName?: string) => Promise<string | null>
   logout: () => Promise<void>
+}
+
+function toAuthUser(user: User): AuthUser {
+  return {
+    id: user.id,
+    email: user.email ?? '',
+    displayName: user.user_metadata?.display_name ?? null,
+  }
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>({
-    isLoggedIn: false,
-    loading: true,
-    error: null,
-  })
+  const [state, setState] = useState<AuthState>({ user: null, loading: true })
 
   useEffect(() => {
-    let mounted = true
+    let ignore = false
 
-    async function init() {
-      try {
-        await initSmartUser()
-        const logged = smartUser.isUserLogged()
-        if (mounted) setState({ isLoggedIn: logged, loading: false, error: null })
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'SDK setup failed'
-        if (mounted) setState({ isLoggedIn: false, loading: false, error: message })
-      }
-    }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (ignore) return
+      setState({ user: session?.user ? toAuthUser(session.user) : null, loading: false })
+    })
 
-    init()
-
-    const handleStatusChange = () => {
-      if (mounted) {
-        setState((prev) => ({ ...prev, isLoggedIn: smartUser.isUserLogged() }))
-      }
-    }
-    smartUser.on('user-status-did-change', handleStatusChange)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (ignore) return
+      setState({ user: session?.user ? toAuthUser(session.user) : null, loading: false })
+    })
 
     return () => {
-      mounted = false
-      smartUser.removeListener('user-status-did-change', handleStatusChange)
+      ignore = true
+      subscription.unsubscribe()
     }
   }, [])
 
   const login = useCallback(async (email: string, password: string): Promise<string | null> => {
-    try {
-      await smartUser.loginWithEmail(email, password)
-      setState((prev) => ({ ...prev, isLoggedIn: true, error: null }))
-      return null
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Login failed'
-      setState((prev) => ({ ...prev, error: message }))
-      return message
-    }
+    const { error } = await signIn(email, password)
+    return error
   }, [])
 
-  const signup = useCallback(async (email: string, password: string): Promise<string | null> => {
-    try {
-      await smartUser.signupWithEmail(email, password)
-      setState((prev) => ({ ...prev, isLoggedIn: true, error: null }))
-      return null
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Signup failed'
-      setState((prev) => ({ ...prev, error: message }))
-      return message
-    }
+  const signup = useCallback(async (email: string, password: string, displayName?: string): Promise<string | null> => {
+    const { error } = await signUp(email, password, displayName)
+    return error
   }, [])
 
   const logout = useCallback(async () => {
-    try {
-      await smartUser.logout()
-      setState({ isLoggedIn: false, loading: false, error: null })
-    } catch {
-      setState({ isLoggedIn: false, loading: false, error: null })
-    }
+    await signOut()
   }, [])
 
   return (

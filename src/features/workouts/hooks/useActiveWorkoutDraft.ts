@@ -4,12 +4,12 @@ import { workoutDraftReducer, initialDraftState } from '../state/workoutDraftRed
 import { createWorkout } from '../api/workoutsApi'
 import { countValidDraftSets } from '../utils/workoutCalculations'
 import { ROUTES } from '../../../shared/routes'
-import { ACTIVE_WORKOUT_DRAFT_KEY } from '../constants'
+import { getDraftStorageKey } from '../constants'
 import type { WorkoutDraft, DraftExercise } from '../types'
 import type { Exercise } from '../../exercises/types'
 
-function loadFromStorage(): { name: string; startedAt: string; exercises: DraftExercise[] } | null {
-  const raw = localStorage.getItem(ACTIVE_WORKOUT_DRAFT_KEY)
+function loadFromStorage(key: string): { name: string; startedAt: string; exercises: DraftExercise[] } | null {
+  const raw = localStorage.getItem(key)
   if (!raw) return null
   try {
     const parsed = JSON.parse(raw) as WorkoutDraft
@@ -20,21 +20,23 @@ function loadFromStorage(): { name: string; startedAt: string; exercises: DraftE
   }
 }
 
-function saveToStorage(name: string, startedAt: string, exercises: DraftExercise[]): void {
+function saveToStorage(key: string, name: string, startedAt: string, exercises: DraftExercise[]): void {
   const draft: WorkoutDraft = { version: 1, name, startedAt, exercises }
-  localStorage.setItem(ACTIVE_WORKOUT_DRAFT_KEY, JSON.stringify(draft))
+  localStorage.setItem(key, JSON.stringify(draft))
 }
 
-export function clearDraftStorage(): void {
-  localStorage.removeItem(ACTIVE_WORKOUT_DRAFT_KEY)
+export function clearDraftStorage(userId: string): void {
+  localStorage.removeItem(getDraftStorageKey(userId))
 }
 
-export function hasDraft(): boolean {
-  return localStorage.getItem(ACTIVE_WORKOUT_DRAFT_KEY) !== null
+export function hasDraft(userId: string | null): boolean {
+  if (!userId) return false
+  return localStorage.getItem(getDraftStorageKey(userId)) !== null
 }
 
-export function getDraftSummary(): { exerciseCount: number; setCount: number; startedAt: string } | null {
-  const raw = localStorage.getItem(ACTIVE_WORKOUT_DRAFT_KEY)
+export function getDraftSummary(userId: string | null): { exerciseCount: number; setCount: number; startedAt: string } | null {
+  if (!userId) return null
+  const raw = localStorage.getItem(getDraftStorageKey(userId))
   if (!raw) return null
   try {
     const parsed = JSON.parse(raw) as WorkoutDraft
@@ -46,21 +48,22 @@ export function getDraftSummary(): { exerciseCount: number; setCount: number; st
   }
 }
 
-export function useActiveWorkoutDraft() {
+export function useActiveWorkoutDraft(userId: string) {
   const navigate = useNavigate()
   const [state, dispatch] = useReducer(workoutDraftReducer, initialDraftState)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const initialized = useRef(false)
+  const storageKey = getDraftStorageKey(userId)
 
   useEffect(() => {
-    const saved = loadFromStorage()
+    const saved = loadFromStorage(storageKey)
     if (saved) {
       dispatch({ type: 'INIT', payload: saved })
     } else {
       dispatch({ type: 'INIT', payload: { name: '', startedAt: new Date().toISOString(), exercises: [] } })
     }
     initialized.current = true
-  }, [])
+  }, [storageKey])
 
   useEffect(() => {
     if (!initialized.current) return
@@ -68,13 +71,13 @@ export function useActiveWorkoutDraft() {
 
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
-      saveToStorage(state.name, state.startedAt, state.exercises)
+      saveToStorage(storageKey, state.name, state.startedAt, state.exercises)
     }, 400)
 
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current)
     }
-  }, [state])
+  }, [state, storageKey])
 
   const setName = useCallback((name: string) => {
     dispatch({ type: 'SET_NAME', payload: name })
@@ -105,10 +108,10 @@ export function useActiveWorkoutDraft() {
   }, [])
 
   const discard = useCallback(() => {
-    clearDraftStorage()
+    clearDraftStorage(userId)
     dispatch({ type: 'RESET' })
     navigate(ROUTES.home)
-  }, [navigate])
+  }, [navigate, userId])
 
   const finish = useCallback(async (): Promise<string | null> => {
     const validSets = countValidDraftSets(state.exercises)
@@ -119,11 +122,11 @@ export function useActiveWorkoutDraft() {
 
     if (result.error) return result.error
 
-    clearDraftStorage()
+    clearDraftStorage(userId)
     dispatch({ type: 'RESET' })
     navigate(ROUTES.workoutDetail(result.data!.id))
     return null
-  }, [state, navigate])
+  }, [state, navigate, userId])
 
   const validSetCount = countValidDraftSets(state.exercises)
 

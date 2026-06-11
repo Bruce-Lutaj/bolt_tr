@@ -8,10 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@digitalvirgo/su-bolt-react": "^1.9.2",
     "@supabase/supabase-js": "^2.108.1",
-    "@types/crypto-js": "^4.2.2",
-    "crypto-js": "^4.2.0",
     "lucide-react": "^1.17.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

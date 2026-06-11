@@ -1,4 +1,5 @@
 import { supabase } from '../../../lib/supabase/client'
+import { getCurrentUserId } from '../../auth/api/authApi'
 import type { Exercise } from '../types'
 
 export async function fetchAllExercises(): Promise<{ data: Exercise[] | null; error: string | null }> {
@@ -36,9 +37,14 @@ export async function fetchRecentExercises(limit = 20): Promise<{ data: Exercise
 }
 
 export async function createExercise(name: string, muscleGroup: string): Promise<{ data: Exercise | null; error: string | null }> {
+  const accountId = await getCurrentUserId()
+  if (!accountId) {
+    return { data: null, error: 'Not authenticated' }
+  }
+
   const { data, error } = await supabase
     .from('exercises')
-    .insert({ name: name.trim(), muscle_group: muscleGroup, is_custom: true })
+    .insert({ name: name.trim(), muscle_group: muscleGroup, is_custom: true, account_id: accountId })
     .select()
     .single()
 

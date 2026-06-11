@@ -11,13 +11,13 @@ import Exercises from '../pages/Exercises'
 import Login from '../pages/Login'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isLoggedIn, loading } = useAuth()
+  const { user, loading } = useAuth()
 
   if (loading) {
     return <LoadingSpinner className="flex justify-center items-center min-h-[60vh]" />
   }
 
-  if (!isLoggedIn) {
+  if (!user) {
     return <Navigate to={ROUTES.login} replace />
   }
 
@@ -25,13 +25,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
-  const { isLoggedIn, loading } = useAuth()
+  const { user, loading } = useAuth()
 
   if (loading) {
     return <LoadingSpinner className="flex justify-center items-center min-h-[60vh]" />
   }
 
-  if (isLoggedIn) {
+  if (user) {
     return <Navigate to={ROUTES.home} replace />
   }
 

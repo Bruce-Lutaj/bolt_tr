@@ -2,10 +2,10 @@ import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fetchWorkoutForRepeat } from '../api/workoutsApi'
 import { ROUTES } from '../../../shared/routes'
-import { ACTIVE_WORKOUT_DRAFT_KEY } from '../constants'
+import { getDraftStorageKey } from '../constants'
 import type { WorkoutDraft } from '../types'
 
-export function useRepeatWorkout() {
+export function useRepeatWorkout(userId: string) {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
 
@@ -42,10 +42,10 @@ export function useRepeatWorkout() {
       })),
     }
 
-    localStorage.setItem(ACTIVE_WORKOUT_DRAFT_KEY, JSON.stringify(draft))
+    localStorage.setItem(getDraftStorageKey(userId), JSON.stringify(draft))
     navigate(ROUTES.workout)
     setLoading(false)
-  }, [navigate])
+  }, [navigate, userId])
 
   return { repeat, loading }
 }

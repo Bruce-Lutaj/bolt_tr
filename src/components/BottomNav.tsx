@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { Hop as Home, Dumbbell, ChartBar as BarChart3, Clock, ListChecks } from 'lucide-react'
 import { NAV_LEFT_ITEMS, NAV_RIGHT_ITEMS, ROUTES } from '../shared/routes'
 import { hasDraft } from '../features/workouts'
+import { useAuth } from '../features/auth'
 
 const iconMap: Record<string, typeof Home> = {
   Home,
@@ -12,7 +13,8 @@ const iconMap: Record<string, typeof Home> = {
 
 export default function BottomNav() {
   const navigate = useNavigate()
-  const draftActive = hasDraft()
+  const { user } = useAuth()
+  const draftActive = hasDraft(user?.id ?? null)
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-sm border-t border-slate-800 z-50 pb-[env(safe-area-inset-bottom)]">
