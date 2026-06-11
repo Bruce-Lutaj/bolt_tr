@@ -1,90 +1,46 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Trash2, RotateCcw } from 'lucide-react'
-import { supabase } from '../supabase'
-import { saveDraft, type WorkoutDraft } from '../lib/workoutDraft'
-import type { WorkoutWithExercises } from '../types'
+import { useWorkoutDetail, useRepeatWorkout, calculateTotalVolume, calculateTotalSets, deleteWorkout } from '../features/workouts'
+import { ROUTES } from '../shared/routes'
+import { formatDateLong, formatVolume } from '../shared/formatters'
+import { LoadingSpinner, InlineError } from '../components/ui'
 
 export default function WorkoutDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const [workout, setWorkout] = useState<WorkoutWithExercises | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { workout, loading, error } = useWorkoutDetail(id)
+  const { repeat } = useRepeatWorkout()
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!id) return
-    supabase
-      .from('workouts')
-      .select('*, workout_exercises(*, workout_sets(*))')
-      .eq('id', id)
-      .maybeSingle()
-      .then(({ data }) => {
-        setWorkout(data as WorkoutWithExercises | null)
-        setLoading(false)
-      })
-  }, [id])
-
-  async function deleteWorkout() {
+  async function handleDelete() {
     if (!id || !confirm('Delete this workout?')) return
     setDeleting(true)
-    await supabase.from('workouts').delete().eq('id', id)
-    navigate('/history')
-  }
-
-  function repeatWorkout() {
-    if (!workout) return
-    const sortedExercises = [...workout.workout_exercises].sort((a, b) => a.position - b.position)
-
-    const draft: WorkoutDraft = {
-      version: 1,
-      name: '',
-      startedAt: new Date().toISOString(),
-      exercises: sortedExercises.map((we) => ({
-        id: crypto.randomUUID(),
-        exercise: {
-          id: we.exercise_id ?? crypto.randomUUID(),
-          name: we.exercise_name_snapshot,
-          muscle_group: we.muscle_group_snapshot,
-          is_custom: false,
-          archived_at: null,
-          created_at: '',
-        },
-        sets: [...we.workout_sets]
-          .sort((a, b) => a.set_number - b.set_number)
-          .map((s) => ({
-            id: crypto.randomUUID(),
-            reps: s.reps.toString(),
-            weight: s.weight_kg.toString(),
-          })),
-      })),
+    const result = await deleteWorkout(id)
+    if (result.error) {
+      setDeleteError(result.error)
+      setDeleting(false)
+    } else {
+      navigate(ROUTES.history)
     }
-    saveDraft(draft)
-    navigate('/workout')
   }
 
   if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
+    return <LoadingSpinner className="flex justify-center items-center h-64" />
   }
 
-  if (!workout) {
+  if (error || !workout) {
     return (
       <div className="px-5 pt-12 text-center text-slate-500">
-        <p>Workout not found</p>
+        <p>{error ?? 'Workout not found'}</p>
       </div>
     )
   }
 
   const sortedExercises = [...workout.workout_exercises].sort((a, b) => a.position - b.position)
-  const totalSets = sortedExercises.reduce((sum, we) => sum + we.workout_sets.length, 0)
-  const totalVolume = sortedExercises.reduce(
-    (sum, we) => sum + we.workout_sets.reduce((s, set) => s + set.reps * set.weight_kg, 0),
-    0
-  )
+  const totalSets = calculateTotalSets(sortedExercises)
+  const totalVolume = calculateTotalVolume(sortedExercises)
 
   return (
     <div className="px-5 pt-10 pb-6">
@@ -97,7 +53,7 @@ export default function WorkoutDetail() {
         </button>
         <div className="flex items-center gap-1">
           <button
-            onClick={repeatWorkout}
+            onClick={() => repeat(workout.id)}
             className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-green-400 hover:text-green-300 bg-green-600/10 hover:bg-green-600/20 rounded-lg transition-colors"
             title="Repeat this workout"
           >
@@ -105,7 +61,7 @@ export default function WorkoutDetail() {
             Repeat
           </button>
           <button
-            onClick={deleteWorkout}
+            onClick={handleDelete}
             disabled={deleting}
             className="p-2 text-slate-600 hover:text-red-400 transition-colors"
           >
@@ -114,16 +70,13 @@ export default function WorkoutDetail() {
         </div>
       </header>
 
+      <InlineError error={deleteError} className="mb-4" />
+
       <div className="mb-5">
         <h1 className="text-xl font-bold text-white">{workout.name}</h1>
         {workout.completed_at && (
           <p className="text-sm text-slate-500 mt-0.5">
-            {new Date(workout.completed_at).toLocaleDateString('en-US', {
-              weekday: 'long',
-              month: 'long',
-              day: 'numeric',
-              year: 'numeric',
-            })}
+            {formatDateLong(workout.completed_at)}
           </p>
         )}
       </div>
@@ -138,9 +91,7 @@ export default function WorkoutDetail() {
           <p className="text-[9px] text-slate-500 uppercase">Sets</p>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 text-center">
-          <p className="text-lg font-bold text-white">
-            {totalVolume >= 1000 ? `${(totalVolume / 1000).toFixed(1)}K` : Math.round(totalVolume)}
-          </p>
+          <p className="text-lg font-bold text-white">{formatVolume(totalVolume)}</p>
           <p className="text-[9px] text-slate-500 uppercase">Volume (kg)</p>
         </div>
       </div>

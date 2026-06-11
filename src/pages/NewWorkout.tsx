@@ -1,194 +1,53 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Plus, Trash2, Check, X, Timer, Copy, Search } from 'lucide-react'
-import { supabase } from '../supabase'
-import { saveDraft, loadDraft, clearDraft, type DraftExercise, type DraftSet, type WorkoutDraft } from '../lib/workoutDraft'
-import { useElapsedTime } from '../hooks/useElapsedTime'
-import type { Exercise } from '../types'
-
-const MUSCLE_GROUPS = ['All', 'Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core']
+import { useState } from 'react'
+import { Plus, Trash2, Check, X, Timer, Copy } from 'lucide-react'
+import { useActiveWorkoutDraft, useElapsedTime } from '../features/workouts'
+import { ExercisePicker } from '../features/exercises'
+import { InlineError } from '../components/ui'
 
 export default function NewWorkout() {
-  const navigate = useNavigate()
-  const [workoutName, setWorkoutName] = useState('')
-  const [startedAt, setStartedAt] = useState('')
-  const [entries, setEntries] = useState<DraftExercise[]>([])
+  const {
+    state,
+    validSetCount,
+    setName,
+    addExercise,
+    removeExercise,
+    addSet,
+    removeSet,
+    updateSet,
+    copyPreviousSet,
+    discard,
+    finish,
+  } = useActiveWorkoutDraft()
+  const elapsed = useElapsedTime(state.startedAt || null)
   const [showPicker, setShowPicker] = useState(false)
   const [saving, setSaving] = useState(false)
-  const elapsed = useElapsedTime(startedAt || null)
-  const draftSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const draft = loadDraft()
-    if (draft) {
-      setWorkoutName(draft.name)
-      setStartedAt(draft.startedAt)
-      setEntries(draft.exercises)
-    } else {
-      setStartedAt(new Date().toISOString())
-    }
-  }, [])
-
-  const persistDraft = useCallback((name: string, started: string, exercises: DraftExercise[]) => {
-    if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current)
-    draftSaveTimer.current = setTimeout(() => {
-      const draft: WorkoutDraft = { version: 1, name, startedAt: started, exercises }
-      saveDraft(draft)
-    }, 400)
-  }, [])
-
-
-  function addExerciseFromPicker(exercise: Exercise) {
-    const newEntry: DraftExercise = {
-      id: crypto.randomUUID(),
-      exercise,
-      sets: [{ id: crypto.randomUUID(), reps: '', weight: '' }],
-    }
-    const updated = [...entries, newEntry]
-    setEntries(updated)
-    persistDraft(workoutName, startedAt, updated)
-    setShowPicker(false)
-  }
-
-  function addSet(entryId: string) {
-    const updated = entries.map((e) => {
-      if (e.id !== entryId) return e
-      const lastSet = e.sets[e.sets.length - 1]
-      const newSet: DraftSet = {
-        id: crypto.randomUUID(),
-        reps: lastSet?.reps || '',
-        weight: lastSet?.weight || '',
-      }
-      return { ...e, sets: [...e.sets, newSet] }
-    })
-    setEntries(updated)
-    persistDraft(workoutName, startedAt, updated)
-  }
-
-  function copyPreviousSet(entryId: string, setIndex: number) {
-    const updated = entries.map((e) => {
-      if (e.id !== entryId || setIndex === 0) return e
-      const prev = e.sets[setIndex - 1]
-      return {
-        ...e,
-        sets: e.sets.map((s, i) =>
-          i === setIndex ? { ...s, reps: prev.reps, weight: prev.weight } : s
-        ),
-      }
-    })
-    setEntries(updated)
-    persistDraft(workoutName, startedAt, updated)
-  }
-
-  function updateSet(entryId: string, setId: string, field: 'reps' | 'weight', value: string) {
-    const updated = entries.map((e) =>
-      e.id === entryId
-        ? { ...e, sets: e.sets.map((s) => (s.id === setId ? { ...s, [field]: value } : s)) }
-        : e
-    )
-    setEntries(updated)
-    persistDraft(workoutName, startedAt, updated)
-  }
-
-  function removeSet(entryId: string, setId: string) {
-    const updated = entries
-      .map((e) =>
-        e.id === entryId ? { ...e, sets: e.sets.filter((s) => s.id !== setId) } : e
-      )
-      .filter((e) => e.sets.length > 0)
-    setEntries(updated)
-    persistDraft(workoutName, startedAt, updated)
-  }
-
-  function removeExercise(entryId: string) {
-    const updated = entries.filter((e) => e.id !== entryId)
-    setEntries(updated)
-    persistDraft(workoutName, startedAt, updated)
-  }
-
-  function handleNameChange(name: string) {
-    setWorkoutName(name)
-    persistDraft(name, startedAt, entries)
-  }
-
-  const validSetCount = entries.reduce(
-    (sum, e) => sum + e.sets.filter((s) => s.reps !== '' && s.weight !== '').length,
-    0
-  )
-
-  async function finishWorkout() {
-    if (validSetCount === 0) return
+  async function handleFinish() {
     setSaving(true)
-
-    const name = workoutName.trim() || `Workout ${new Date().toLocaleDateString()}`
-    const now = new Date().toISOString()
-
-    const { data: workout, error: workoutErr } = await supabase
-      .from('workouts')
-      .insert({ name, started_at: startedAt || now, completed_at: now })
-      .select()
-      .single()
-
-    if (workoutErr || !workout) {
+    setError(null)
+    const err = await finish()
+    if (err) {
+      setError(err)
       setSaving(false)
-      return
     }
-
-    const workoutExercises = entries.map((entry, idx) => ({
-      workout_id: workout.id,
-      exercise_id: entry.exercise.id,
-      exercise_name_snapshot: entry.exercise.name,
-      muscle_group_snapshot: entry.exercise.muscle_group,
-      position: idx + 1,
-    }))
-
-    const { data: insertedExercises, error: exErr } = await supabase
-      .from('workout_exercises')
-      .insert(workoutExercises)
-      .select()
-
-    if (exErr || !insertedExercises) {
-      setSaving(false)
-      return
-    }
-
-    const sets = entries.flatMap((entry, entryIdx) => {
-      const workoutExercise = insertedExercises[entryIdx]
-      return entry.sets
-        .filter((s) => s.reps !== '' && s.weight !== '')
-        .map((s, idx) => ({
-          workout_exercise_id: workoutExercise.id,
-          set_number: idx + 1,
-          reps: parseInt(s.reps) || 1,
-          weight_kg: parseFloat(s.weight) || 0,
-        }))
-    })
-
-    if (sets.length > 0) {
-      await supabase.from('workout_sets').insert(sets)
-    }
-
-    clearDraft()
-    navigate(`/history/${workout.id}`)
   }
 
-  function discardWorkout() {
+  function handleDiscard() {
     if (!confirm('Discard this workout? All progress will be lost.')) return
-    clearDraft()
-    navigate('/')
+    discard()
   }
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-5rem)]">
-      {/* Sticky header */}
       <div className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-sm border-b border-slate-800/50 px-5 py-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
             <input
               type="text"
               placeholder="Workout name"
-              value={workoutName}
-              onChange={(e) => handleNameChange(e.target.value)}
+              value={state.name}
+              onChange={(e) => setName(e.target.value)}
               className="w-full text-base font-semibold text-white bg-transparent placeholder-slate-600 focus:outline-none truncate"
             />
             <div className="flex items-center gap-3 mt-0.5">
@@ -197,7 +56,7 @@ export default function NewWorkout() {
                 {elapsed}
               </span>
               <span className="text-xs text-slate-600">
-                {entries.length} exercises
+                {state.exercises.length} exercises
               </span>
               <span className="text-xs text-slate-600">
                 {validSetCount} sets
@@ -206,14 +65,14 @@ export default function NewWorkout() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={discardWorkout}
+              onClick={handleDiscard}
               className="p-2 text-slate-500 hover:text-red-400 transition-colors"
               title="Discard workout"
             >
               <X size={18} />
             </button>
             <button
-              onClick={finishWorkout}
+              onClick={handleFinish}
               disabled={validSetCount === 0 || saving}
               className="flex items-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-semibold rounded-lg transition-colors"
             >
@@ -222,17 +81,17 @@ export default function NewWorkout() {
             </button>
           </div>
         </div>
+        <InlineError error={error} className="mt-2" />
       </div>
 
-      {/* Exercise entries */}
       <div className="flex-1 px-5 py-4 space-y-4">
-        {entries.length === 0 && (
+        {state.exercises.length === 0 && (
           <div className="text-center py-16 text-slate-500">
             <p className="text-sm">Add exercises to start your workout</p>
           </div>
         )}
 
-        {entries.map((entry) => (
+        {state.exercises.map((entry) => (
           <div key={entry.id} className="bg-slate-900 border border-slate-800 rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
               <div>
@@ -315,7 +174,6 @@ export default function NewWorkout() {
         ))}
       </div>
 
-      {/* Sticky bottom add exercise */}
       <div className="sticky bottom-20 px-5 pb-4 pt-2">
         <button
           onClick={() => setShowPicker(true)}
@@ -328,169 +186,13 @@ export default function NewWorkout() {
 
       {showPicker && (
         <ExercisePicker
-          onSelect={addExerciseFromPicker}
+          onSelect={(exercise) => {
+            addExercise(exercise)
+            setShowPicker(false)
+          }}
           onClose={() => setShowPicker(false)}
         />
       )}
-    </div>
-  )
-}
-
-function ExercisePicker({ onSelect, onClose }: { onSelect: (e: Exercise) => void; onClose: () => void }) {
-  const [exercises, setExercises] = useState<Exercise[]>([])
-  const [recentExercises, setRecentExercises] = useState<Exercise[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
-  const [activeGroup, setActiveGroup] = useState('All')
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    loadExercises()
-  }, [])
-
-  async function loadExercises() {
-    const [allRes, recentRes] = await Promise.all([
-      supabase
-        .from('exercises')
-        .select('*')
-        .is('archived_at', null)
-        .order('muscle_group')
-        .order('name'),
-      supabase
-        .from('workout_exercises')
-        .select('exercise_id, exercises!inner(*)')
-        .not('exercise_id', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(20),
-    ])
-
-    if (allRes.data) setExercises(allRes.data)
-
-    if (recentRes.data) {
-      const seen = new Set<string>()
-      const recent: Exercise[] = []
-      for (const row of recentRes.data) {
-        const ex = row.exercises as unknown as Exercise
-        if (ex && !seen.has(ex.id) && !ex.archived_at) {
-          seen.add(ex.id)
-          recent.push(ex)
-          if (recent.length >= 6) break
-        }
-      }
-      setRecentExercises(recent)
-    }
-    setLoading(false)
-  }
-
-  const filtered = exercises.filter((e) => {
-    const matchesGroup = activeGroup === 'All' || e.muscle_group === activeGroup
-    const matchesSearch =
-      !searchQuery ||
-      e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      e.muscle_group.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesGroup && matchesSearch
-  })
-
-  const grouped = filtered.reduce<Record<string, Exercise[]>>((acc, ex) => {
-    if (!acc[ex.muscle_group]) acc[ex.muscle_group] = []
-    acc[ex.muscle_group].push(ex)
-    return acc
-  }, {})
-
-  const showRecent = !searchQuery && activeGroup === 'All' && recentExercises.length > 0
-
-  return (
-    <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
-        <h2 className="text-lg font-bold text-white">Select Exercise</h2>
-        <button
-          onClick={onClose}
-          className="p-2 text-slate-400 hover:text-white transition-colors"
-        >
-          <X size={20} />
-        </button>
-      </div>
-
-      <div className="px-5 py-3 space-y-3 border-b border-slate-800/50">
-        <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
-          <input
-            type="text"
-            placeholder="Search exercises..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            autoFocus
-            className="w-full pl-9 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-600 text-sm focus:outline-none focus:border-green-600"
-          />
-        </div>
-
-        <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
-          {MUSCLE_GROUPS.map((g) => (
-            <button
-              key={g}
-              onClick={() => setActiveGroup(g)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
-                activeGroup === g
-                  ? 'bg-green-600 text-white'
-                  : 'bg-slate-800 text-slate-400 hover:text-white'
-              }`}
-            >
-              {g}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-5 py-4">
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="text-center py-12 text-slate-500">
-            <p className="text-sm">No exercises found</p>
-          </div>
-        ) : (
-          <>
-            {showRecent && (
-              <div className="mb-5">
-                <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                  Recent
-                </p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {recentExercises.map((ex) => (
-                    <button
-                      key={ex.id}
-                      onClick={() => onSelect(ex)}
-                      className="text-left px-3 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white hover:border-green-600 transition-colors truncate"
-                    >
-                      {ex.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {Object.entries(grouped).map(([group, exs]) => (
-              <div key={group} className="mb-4">
-                <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                  {group}
-                </p>
-                <div className="space-y-1">
-                  {exs.map((ex) => (
-                    <button
-                      key={ex.id}
-                      onClick={() => onSelect(ex)}
-                      className="w-full text-left px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-sm text-white hover:border-green-600 transition-colors"
-                    >
-                      {ex.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </>
-        )}
-      </div>
     </div>
   )
 }

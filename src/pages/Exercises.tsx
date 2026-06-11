@@ -1,58 +1,35 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Plus, X, Search, Archive } from 'lucide-react'
-import { supabase } from '../supabase'
-import type { Exercise } from '../types'
-
-const MUSCLE_GROUPS = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core']
+import { useExercises } from '../features/exercises'
+import { MUSCLE_GROUPS } from '../shared/constants'
+import { LoadingSpinner, InlineError } from '../components/ui'
 
 export default function Exercises() {
-  const [exercises, setExercises] = useState<Exercise[]>([])
-  const [loading, setLoading] = useState(true)
+  const { exercises, loading, error, create, archive } = useExercises()
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const [newName, setNewName] = useState('')
   const [newGroup, setNewGroup] = useState('Chest')
   const [adding, setAdding] = useState(false)
-
-  useEffect(() => {
-    loadExercises()
-  }, [])
-
-  async function loadExercises() {
-    const { data } = await supabase
-      .from('exercises')
-      .select('*')
-      .is('archived_at', null)
-      .order('muscle_group')
-      .order('name')
-    if (data) setExercises(data)
-    setLoading(false)
-  }
+  const [actionError, setActionError] = useState<string | null>(null)
 
   async function addExercise() {
     if (!newName.trim()) return
     setAdding(true)
-    const { data, error } = await supabase
-      .from('exercises')
-      .insert({ name: newName.trim(), muscle_group: newGroup, is_custom: true })
-      .select()
-      .single()
-    if (!error && data) {
-      setExercises([...exercises, data].sort((a, b) => a.name.localeCompare(b.name)))
+    setActionError(null)
+    const err = await create(newName, newGroup)
+    if (err) {
+      setActionError(err)
+    } else {
       setNewName('')
       setShowAdd(false)
     }
     setAdding(false)
   }
 
-  async function archiveExercise(id: string) {
-    const { error } = await supabase
-      .from('exercises')
-      .update({ archived_at: new Date().toISOString() })
-      .eq('id', id)
-    if (!error) {
-      setExercises(exercises.filter((e) => e.id !== id))
-    }
+  async function handleArchive(id: string) {
+    const err = await archive(id)
+    if (err) setActionError(err)
   }
 
   const filtered = exercises.filter(
@@ -61,7 +38,7 @@ export default function Exercises() {
       e.muscle_group.toLowerCase().includes(search.toLowerCase())
   )
 
-  const grouped = filtered.reduce<Record<string, Exercise[]>>((acc, ex) => {
+  const grouped = filtered.reduce<Record<string, typeof exercises>>((acc, ex) => {
     if (!acc[ex.muscle_group]) acc[ex.muscle_group] = []
     acc[ex.muscle_group].push(ex)
     return acc
@@ -83,6 +60,8 @@ export default function Exercises() {
         </button>
       </header>
 
+      <InlineError error={error ?? actionError} className="mb-4" />
+
       <div className="relative mb-5">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
         <input
@@ -95,9 +74,7 @@ export default function Exercises() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
-        </div>
+        <LoadingSpinner />
       ) : (
         <div className="space-y-6">
           {Object.entries(grouped).map(([group, exs]) => (
@@ -118,7 +95,7 @@ export default function Exercises() {
                       )}
                     </div>
                     <button
-                      onClick={() => archiveExercise(ex.id)}
+                      onClick={() => handleArchive(ex.id)}
                       className="p-1.5 text-slate-600 hover:text-amber-400 transition-colors"
                       title="Archive exercise"
                     >

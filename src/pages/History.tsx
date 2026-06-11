@@ -1,63 +1,17 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Calendar, Dumbbell, ChevronRight } from 'lucide-react'
-import { supabase } from '../supabase'
-import type { Workout } from '../types'
-
-interface HistoryWorkout extends Workout {
-  exerciseCount: number
-  setCount: number
-  volume: number
-}
+import { useWorkoutHistory } from '../features/workouts'
+import { ROUTES } from '../shared/routes'
+import { formatDateGrouped, formatVolume } from '../shared/formatters'
+import { LoadingSpinner, EmptyState, InlineError } from '../components/ui'
 
 export default function History() {
-  const [workouts, setWorkouts] = useState<HistoryWorkout[]>([])
-  const [loading, setLoading] = useState(true)
+  const { workouts, loading, error } = useWorkoutHistory()
 
-  useEffect(() => {
-    loadWorkouts()
-  }, [])
-
-  async function loadWorkouts() {
-    const { data } = await supabase
-      .from('workouts')
-      .select('*, workout_exercises(id, workout_sets(reps, weight_kg))')
-      .not('completed_at', 'is', null)
-      .order('completed_at', { ascending: false })
-
-    if (data) {
-      setWorkouts(
-        data.map((w) => {
-          const exs = w.workout_exercises as { id: string; workout_sets: { reps: number; weight_kg: number }[] }[] | undefined
-          const exerciseCount = exs?.length ?? 0
-          const setCount = exs ? exs.reduce((sum, we) => sum + we.workout_sets.length, 0) : 0
-          const volume = exs
-            ? exs.reduce((sum, we) => sum + we.workout_sets.reduce((s, set) => s + set.reps * set.weight_kg, 0), 0)
-            : 0
-          return { ...w, exerciseCount, setCount, volume }
-        })
-      )
-    }
-    setLoading(false)
-  }
-
-  function formatDate(dateStr: string) {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'short',
-      day: 'numeric',
-    })
-  }
-
-  function formatVolume(vol: number) {
-    if (vol >= 1000) return `${(vol / 1000).toFixed(1)}K`
-    return Math.round(vol).toString()
-  }
-
-  function groupByDate(items: HistoryWorkout[]) {
-    const groups: Record<string, HistoryWorkout[]> = {}
+  function groupByDate(items: typeof workouts) {
+    const groups: Record<string, typeof workouts> = {}
     for (const w of items) {
-      const key = w.completed_at ? new Date(w.completed_at).toDateString() : 'Unknown'
+      const key = new Date(w.completed_at).toDateString()
       if (!groups[key]) groups[key] = []
       groups[key].push(w)
     }
@@ -73,30 +27,29 @@ export default function History() {
         <p className="text-slate-500 text-sm mt-0.5">{workouts.length} workouts logged</p>
       </header>
 
+      <InlineError error={error} className="mb-4" />
+
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
-        </div>
+        <LoadingSpinner />
       ) : workouts.length === 0 ? (
-        <div className="text-center py-12 text-slate-500">
-          <Calendar size={28} className="mx-auto mb-2 opacity-40" />
-          <p className="text-sm">No workouts completed yet</p>
-          <Link to="/workout" className="text-green-500 text-sm mt-2 inline-block hover:text-green-400">
-            Start your first workout
-          </Link>
-        </div>
+        <EmptyState
+          icon={<Calendar size={28} />}
+          message="No workouts completed yet"
+          actionLabel="Start your first workout"
+          actionTo={ROUTES.workout}
+        />
       ) : (
         <div className="space-y-5">
           {Object.entries(grouped).map(([date, items]) => (
             <div key={date}>
               <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                {formatDate(items[0].completed_at!)}
+                {formatDateGrouped(items[0].completed_at)}
               </p>
               <div className="space-y-2">
                 {items.map((w) => (
                   <Link
                     key={w.id}
-                    to={`/history/${w.id}`}
+                    to={ROUTES.workoutDetail(w.id)}
                     className="flex items-center gap-3 p-3.5 bg-slate-900 border border-slate-800 rounded-lg hover:border-slate-700 transition-colors"
                   >
                     <div className="w-10 h-10 bg-green-600/15 rounded-lg flex items-center justify-center shrink-0">
