@@ -1,14 +1,12 @@
 import {
-  initSmartUser,
   smartUserLogin as clientLogin,
   smartUserSignup as clientSignup,
   smartUserLogout as clientLogout,
   getSmartUserSession,
   getSmartUserId,
-  isSmartUserConfigured,
 } from '../../../lib/smartuser/client'
 
-export { isSmartUserConfigured, getSmartUserId, getSmartUserSession, initSmartUser }
+export { getSmartUserId, getSmartUserSession }
 
 export async function smartUserLogin(
   email: string,

@@ -6,7 +6,6 @@ import {
   smartUserSignup as suSignup,
   smartUserLogout as suLogout,
   getSmartUserSession,
-  initSmartUser,
 } from '../api/smartUserAuthApi'
 import type { User } from '@supabase/supabase-js'
 
@@ -63,7 +62,7 @@ export function AuthProviderComponent({ children }: { children: ReactNode }) {
     }
     if (savedMode === 'smartuser') {
       const session = getSmartUserSession()
-      if (session && session.logged) {
+      if (session) {
         return {
           user: { id: session.userId, email: session.email, displayName: null, provider: 'smartuser' },
           loading: false,
@@ -75,10 +74,6 @@ export function AuthProviderComponent({ children }: { children: ReactNode }) {
     }
     return { user: null, loading: true, isGuest: false, provider: null }
   })
-
-  useEffect(() => {
-    initSmartUser()
-  }, [])
 
   useEffect(() => {
     if (state.isGuest || state.provider === 'smartuser') return

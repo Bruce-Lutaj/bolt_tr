@@ -1,12 +1,12 @@
-const SMARTUSER_APP_ID = import.meta.env.VITE_SMARTUSER_APP_ID ?? ''
-const SMARTUSER_ENV = import.meta.env.VITE_SMARTUSER_ENV ?? 'STAG'
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 const SESSION_KEY = 'gymtrack.smartuser.session'
 
 export interface SmartUserSessionData {
   userId: string
   email: string
-  logged: boolean
+  token?: string
 }
 
 function readSession(): SmartUserSessionData | null {
@@ -27,109 +27,71 @@ function clearSession(): void {
   localStorage.removeItem(SESSION_KEY)
 }
 
-interface SmartUserSdk {
-  init(config: { appId: string; environment: string }): void
-  loginWithEmail(email: string, password: string): Promise<{ success: boolean; error?: string }>
-  signupWithEmail(email: string, password: string): Promise<{ success: boolean; error?: string }>
-  logout(): Promise<void>
-  isUserLogged(): boolean
-  getObfuscatedReference(): string | null
-  getAbsoluteReference(): string | null
-}
+async function callEdgeFunction(
+  functionName: string,
+  body: Record<string, unknown>
+): Promise<{ data: SmartUserSessionData | null; error: string | null }> {
+  const url = `${SUPABASE_URL}/functions/v1/${functionName}`
 
-let sdkAvailable = false
-let sdkInstance: SmartUserSdk | null = null
-
-async function loadSdk(): Promise<boolean> {
-  if (sdkInstance) return true
+  let response: Response
   try {
-    // Dynamic import using a variable to prevent Rollup from resolving it at build time.
-    // Once @digitalvirgo/su-bolt-react is installed, this will resolve at runtime.
-    const moduleName = '@digitalvirgo/su-bolt-react'
-    const mod = await (Function('m', 'return import(m)')(moduleName) as Promise<{ default: SmartUserSdk }>)
-    sdkInstance = mod.default
-    sdkInstance.init({ appId: SMARTUSER_APP_ID, environment: SMARTUSER_ENV })
-    sdkAvailable = true
-    return true
-  } catch {
-    sdkAvailable = false
-    return false
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify(body),
+    })
+  } catch (err) {
+    return { data: null, error: err instanceof Error ? err.message : 'Network error' }
   }
-}
 
-export async function initSmartUser(): Promise<boolean> {
-  if (!SMARTUSER_APP_ID) return false
-  return loadSdk()
-}
+  const json = await response.json()
 
-export function isSmartUserConfigured(): boolean {
-  return !!SMARTUSER_APP_ID
-}
+  if (!response.ok) {
+    return { data: null, error: json.error ?? `Request failed (${response.status})` }
+  }
 
-export function isSdkLoaded(): boolean {
-  return sdkAvailable
+  if (!json.userId) {
+    return { data: null, error: 'Server did not return a valid user identity' }
+  }
+
+  return {
+    data: { userId: json.userId, email: json.email, token: json.token },
+    error: null,
+  }
 }
 
 export async function smartUserLogin(
   email: string,
   password: string
 ): Promise<{ userId: string | null; error: string | null }> {
-  const loaded = await loadSdk()
-  if (!loaded || !sdkInstance) {
-    const userId = `su_${btoa(email).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16)}`
-    const session: SmartUserSessionData = { userId, email, logged: true }
-    writeSession(session)
-    return { userId, error: null }
+  const { data, error } = await callEdgeFunction('smartuser-login', { email, password })
+  if (error || !data) {
+    return { userId: null, error: error ?? 'Login failed' }
   }
-
-  const result = await sdkInstance.loginWithEmail(email, password)
-  if (!result.success) {
-    return { userId: null, error: result.error ?? 'Login failed' }
-  }
-
-  const userId = sdkInstance.getObfuscatedReference() ?? sdkInstance.getAbsoluteReference() ?? `su_${Date.now()}`
-  const session: SmartUserSessionData = { userId, email, logged: true }
-  writeSession(session)
-  return { userId, error: null }
+  writeSession(data)
+  return { userId: data.userId, error: null }
 }
 
 export async function smartUserSignup(
   email: string,
   password: string
 ): Promise<{ userId: string | null; error: string | null }> {
-  const loaded = await loadSdk()
-  if (!loaded || !sdkInstance) {
-    const userId = `su_${btoa(email).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16)}`
-    const session: SmartUserSessionData = { userId, email, logged: true }
-    writeSession(session)
-    return { userId, error: null }
+  const { data, error } = await callEdgeFunction('smartuser-signup', { email, password })
+  if (error || !data) {
+    return { userId: null, error: error ?? 'Signup failed' }
   }
-
-  const result = await sdkInstance.signupWithEmail(email, password)
-  if (!result.success) {
-    return { userId: null, error: result.error ?? 'Signup failed' }
-  }
-
-  const userId = sdkInstance.getObfuscatedReference() ?? sdkInstance.getAbsoluteReference() ?? `su_${Date.now()}`
-  const session: SmartUserSessionData = { userId, email, logged: true }
-  writeSession(session)
-  return { userId, error: null }
+  writeSession(data)
+  return { userId: data.userId, error: null }
 }
 
 export async function smartUserLogout(): Promise<void> {
-  if (sdkInstance) {
-    try {
-      await sdkInstance.logout()
-    } catch { /* ignore */ }
-  }
   clearSession()
 }
 
 export function getSmartUserSession(): SmartUserSessionData | null {
-  if (sdkInstance && sdkInstance.isUserLogged()) {
-    const stored = readSession()
-    if (stored) return stored
-  }
   return readSession()
 }
 
