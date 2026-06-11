@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom'
-import { Dumbbell, TrendingUp, Calendar, Flame, Play, ChevronRight, RotateCcw, LogOut } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Dumbbell, TrendingUp, Calendar, Flame, Play, ChevronRight, RotateCcw, LogOut, LogIn } from 'lucide-react'
 import { useHomeStats, useRepeatWorkout, useElapsedTime, getDraftSummary } from '../features/workouts'
 import { useAuth } from '../features/auth'
 import { ROUTES } from '../shared/routes'
@@ -7,10 +7,12 @@ import { formatDate, formatVolume } from '../shared/formatters'
 import { LoadingSpinner, StatCard, EmptyState, InlineError } from '../components/ui'
 
 export default function Home() {
-  const { user, logout } = useAuth()
+  const { user, isGuest, logout } = useAuth()
+  const navigate = useNavigate()
+  const userId = user?.id ?? 'guest'
   const { recentWorkouts, stats, loading, error } = useHomeStats()
-  const { repeat } = useRepeatWorkout(user!.id)
-  const draftSummary = getDraftSummary(user!.id)
+  const { repeat } = useRepeatWorkout(userId)
+  const draftSummary = getDraftSummary(userId)
   const elapsed = useElapsedTime(draftSummary?.startedAt ?? null)
 
   return (
@@ -19,16 +21,29 @@ export default function Home() {
         <div>
           <h1 className="text-2xl font-bold text-white">GymTrack</h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            {user?.displayName || user?.email}
+            {isGuest ? 'Guest mode' : (user?.displayName || user?.email)}
           </p>
         </div>
-        <button
-          onClick={logout}
-          className="p-2 text-slate-500 hover:text-slate-300 transition-colors rounded-lg hover:bg-slate-800"
-          title="Sign out"
-        >
-          <LogOut size={18} />
-        </button>
+        {isGuest ? (
+          <button
+            onClick={() => {
+              logout()
+              navigate(ROUTES.login)
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-green-400 hover:text-green-300 bg-green-600/10 hover:bg-green-600/20 rounded-lg transition-colors"
+          >
+            <LogIn size={15} />
+            Sign in
+          </button>
+        ) : (
+          <button
+            onClick={logout}
+            className="p-2 text-slate-500 hover:text-slate-300 transition-colors rounded-lg hover:bg-slate-800"
+            title="Sign out"
+          >
+            <LogOut size={18} />
+          </button>
+        )}
       </header>
 
       <InlineError error={error} className="mb-4" />

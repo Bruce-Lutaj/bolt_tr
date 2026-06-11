@@ -1,10 +1,54 @@
 import { supabase } from '../../../lib/supabase/client'
+import { isGuestMode } from '../../guest/guestStore'
 import type { WorkoutExerciseRow } from '../types'
+
+function guestFetchAnalyticsData(): {
+  data: { rows: WorkoutExerciseRow[]; workouts: { completed_at: string | null }[] } | null
+  error: string | null
+} {
+  const raw = localStorage.getItem('gymtrack.guest.workouts')
+  if (!raw) return { data: { rows: [], workouts: [] }, error: null }
+
+  try {
+    const workouts = JSON.parse(raw) as {
+      id: string
+      completed_at: string | null
+      workout_exercises: {
+        id: string
+        exercise_id: string | null
+        exercise_name_snapshot: string
+        muscle_group_snapshot: string
+        workout_id: string
+        workout_sets: { reps: number; weight_kg: number }[]
+      }[]
+    }[]
+
+    const completed = workouts.filter((w) => w.completed_at !== null)
+    const rows: WorkoutExerciseRow[] = completed.flatMap((w) =>
+      w.workout_exercises.map((we) => ({
+        id: we.id,
+        exercise_id: we.exercise_id,
+        exercise_name_snapshot: we.exercise_name_snapshot,
+        muscle_group_snapshot: we.muscle_group_snapshot,
+        workout_id: w.id,
+        workout_sets: we.workout_sets,
+        workouts: { completed_at: w.completed_at! },
+      }))
+    )
+
+    const workoutDates = completed.map((w) => ({ completed_at: w.completed_at }))
+    return { data: { rows, workouts: workoutDates }, error: null }
+  } catch {
+    return { data: { rows: [], workouts: [] }, error: null }
+  }
+}
 
 export async function fetchAnalyticsData(): Promise<{
   data: { rows: WorkoutExerciseRow[]; workouts: { completed_at: string | null }[] } | null
   error: string | null
 }> {
+  if (isGuestMode()) return guestFetchAnalyticsData()
+
   const [weRes, workoutsRes] = await Promise.all([
     supabase
       .from('workout_exercises')

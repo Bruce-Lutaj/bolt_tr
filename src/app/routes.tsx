@@ -10,7 +10,7 @@ import WorkoutDetail from '../pages/WorkoutDetail'
 import Exercises from '../pages/Exercises'
 import Login from '../pages/Login'
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function AppAccessRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
 
   if (loading) {
@@ -42,12 +42,12 @@ export function AppRoutes() {
   return (
     <Routes>
       <Route path={ROUTES.login} element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
-      <Route path={ROUTES.home} element={<ProtectedRoute><Home /></ProtectedRoute>} />
-      <Route path={ROUTES.workout} element={<ProtectedRoute><NewWorkout /></ProtectedRoute>} />
-      <Route path={ROUTES.progress} element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
-      <Route path={ROUTES.history} element={<ProtectedRoute><History /></ProtectedRoute>} />
-      <Route path="/history/:id" element={<ProtectedRoute><WorkoutDetail /></ProtectedRoute>} />
-      <Route path={ROUTES.exercises} element={<ProtectedRoute><Exercises /></ProtectedRoute>} />
+      <Route path={ROUTES.home} element={<AppAccessRoute><Home /></AppAccessRoute>} />
+      <Route path={ROUTES.workout} element={<AppAccessRoute><NewWorkout /></AppAccessRoute>} />
+      <Route path={ROUTES.progress} element={<AppAccessRoute><Analytics /></AppAccessRoute>} />
+      <Route path={ROUTES.history} element={<AppAccessRoute><History /></AppAccessRoute>} />
+      <Route path="/history/:id" element={<AppAccessRoute><WorkoutDetail /></AppAccessRoute>} />
+      <Route path={ROUTES.exercises} element={<AppAccessRoute><Exercises /></AppAccessRoute>} />
       <Route path="*" element={<Navigate to={ROUTES.home} replace />} />
     </Routes>
   )

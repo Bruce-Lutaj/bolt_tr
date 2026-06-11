@@ -5,7 +5,7 @@ import { useAuth } from '../features/auth'
 import { ROUTES } from '../shared/routes'
 
 export default function Login() {
-  const { login, signup } = useAuth()
+  const { login, signup, enterGuest } = useAuth()
   const navigate = useNavigate()
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [email, setEmail] = useState('')
@@ -14,6 +14,11 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null)
   const [infoMessage, setInfoMessage] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  function handleGuest() {
+    enterGuest()
+    navigate(ROUTES.home, { replace: true })
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -50,9 +55,21 @@ export default function Login() {
             <Dumbbell size={32} className="text-green-400" />
           </div>
           <h1 className="text-2xl font-bold text-white">GymTrack</h1>
-          <p className="text-slate-500 text-sm mt-1">
-            {mode === 'login' ? 'Sign in to continue' : 'Create your account'}
-          </p>
+          <p className="text-slate-500 text-sm mt-1">Track workouts. See progress.</p>
+        </div>
+
+        <button
+          onClick={handleGuest}
+          className="flex items-center justify-center gap-2 w-full h-12 bg-green-600 hover:bg-green-500 text-white font-semibold rounded-lg transition-colors text-sm active:scale-[0.98]"
+        >
+          Continue as Guest
+          <ArrowRight size={16} />
+        </button>
+
+        <div className="flex items-center gap-3 my-6">
+          <div className="flex-1 h-px bg-slate-800" />
+          <span className="text-xs text-slate-500">or sign in to save across devices</span>
+          <div className="flex-1 h-px bg-slate-800" />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -109,7 +126,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={submitting}
-            className="flex items-center justify-center gap-2 w-full py-3 bg-green-600 hover:bg-green-500 disabled:bg-green-600/50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors text-sm"
+            className="flex items-center justify-center gap-2 w-full h-12 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-800/50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors text-sm border border-slate-700"
           >
             {submitting ? (
               <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

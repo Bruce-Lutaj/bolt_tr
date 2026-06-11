@@ -19,7 +19,7 @@ export default function NewWorkout() {
     copyPreviousSet,
     discard,
     finish,
-  } = useActiveWorkoutDraft(user!.id)
+  } = useActiveWorkoutDraft(user?.id ?? 'guest')
   const elapsed = useElapsedTime(state.startedAt || null)
   const [showPicker, setShowPicker] = useState(false)
   const [saving, setSaving] = useState(false)

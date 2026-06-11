@@ -1,8 +1,11 @@
 import { supabase } from '../../../lib/supabase/client'
 import { getCurrentUserId } from '../../auth/api/authApi'
+import { isGuestMode, guestFetchRecentWorkouts, guestFetchTotalWorkoutCount, guestFetchWeeklyWorkoutCount, guestFetchTotalVolume, guestFetchWorkoutById, guestFetchWorkoutForRepeat, guestFetchAllWorkoutsWithSets, guestCreateWorkout, guestDeleteWorkout } from '../../guest/guestStore'
 import type { Workout, WorkoutWithExercises, DraftExercise } from '../types'
 
 export async function fetchRecentWorkouts(limit = 3): Promise<{ data: Workout[] | null; error: string | null }> {
+  if (isGuestMode()) return guestFetchRecentWorkouts(limit)
+
   const accountId = await getCurrentUserId()
   if (!accountId) return { data: null, error: 'Not authenticated' }
 
@@ -18,6 +21,8 @@ export async function fetchRecentWorkouts(limit = 3): Promise<{ data: Workout[] 
 }
 
 export async function fetchTotalWorkoutCount(): Promise<{ data: number; error: string | null }> {
+  if (isGuestMode()) return guestFetchTotalWorkoutCount()
+
   const accountId = await getCurrentUserId()
   if (!accountId) return { data: 0, error: 'Not authenticated' }
 
@@ -31,6 +36,8 @@ export async function fetchTotalWorkoutCount(): Promise<{ data: number; error: s
 }
 
 export async function fetchWeeklyWorkoutCount(): Promise<{ data: number; error: string | null }> {
+  if (isGuestMode()) return guestFetchWeeklyWorkoutCount()
+
   const accountId = await getCurrentUserId()
   if (!accountId) return { data: 0, error: 'Not authenticated' }
 
@@ -47,8 +54,9 @@ export async function fetchWeeklyWorkoutCount(): Promise<{ data: number; error: 
   return { data: count ?? 0, error: error?.message ?? null }
 }
 
-// Volume queried from workout_sets -- no account_id column; RLS scopes via grandparent workout.
 export async function fetchTotalVolume(): Promise<{ data: number; error: string | null }> {
+  if (isGuestMode()) return guestFetchTotalVolume()
+
   const accountId = await getCurrentUserId()
   if (!accountId) return { data: 0, error: 'Not authenticated' }
 
@@ -63,6 +71,8 @@ export async function fetchTotalVolume(): Promise<{ data: number; error: string 
 }
 
 export async function fetchWorkoutById(id: string): Promise<{ data: WorkoutWithExercises | null; error: string | null }> {
+  if (isGuestMode()) return guestFetchWorkoutById(id)
+
   const accountId = await getCurrentUserId()
   if (!accountId) return { data: null, error: 'Not authenticated' }
 
@@ -84,8 +94,9 @@ interface RepeatExerciseRow {
   workout_sets: { set_number: number; reps: number; weight_kg: number }[]
 }
 
-// workout_exercises RLS scopes through parent workout ownership.
 export async function fetchWorkoutForRepeat(workoutId: string): Promise<{ data: RepeatExerciseRow[] | null; error: string | null }> {
+  if (isGuestMode()) return guestFetchWorkoutForRepeat(workoutId)
+
   const accountId = await getCurrentUserId()
   if (!accountId) return { data: null, error: 'Not authenticated' }
 
@@ -106,6 +117,8 @@ interface WorkoutRow {
 }
 
 export async function fetchAllWorkoutsWithSets(): Promise<{ data: { id: string; completed_at: string; exerciseCount: number; setCount: number; volume: number; name: string }[] | null; error: string | null }> {
+  if (isGuestMode()) return guestFetchAllWorkoutsWithSets()
+
   const accountId = await getCurrentUserId()
   if (!accountId) return { data: null, error: 'Not authenticated' }
 
@@ -133,6 +146,8 @@ export async function fetchAllWorkoutsWithSets(): Promise<{ data: { id: string; 
 }
 
 export async function createWorkout(name: string, startedAt: string, entries: DraftExercise[]): Promise<{ data: { id: string } | null; error: string | null }> {
+  if (isGuestMode()) return guestCreateWorkout(name, startedAt, entries)
+
   const validEntries = entries.filter(
     (entry) => entry.sets.some((s) => s.reps !== '' && s.weight !== '')
   )
@@ -202,6 +217,8 @@ export async function createWorkout(name: string, startedAt: string, entries: Dr
 }
 
 export async function deleteWorkout(id: string): Promise<{ error: string | null }> {
+  if (isGuestMode()) return guestDeleteWorkout(id)
+
   const accountId = await getCurrentUserId()
   if (!accountId) return { error: 'Not authenticated' }
 

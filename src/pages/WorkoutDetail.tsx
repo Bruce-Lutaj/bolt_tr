@@ -12,7 +12,7 @@ export default function WorkoutDetail() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { workout, loading, error } = useWorkoutDetail(id)
-  const { repeat } = useRepeatWorkout(user!.id)
+  const { repeat } = useRepeatWorkout(user?.id ?? 'guest')
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
