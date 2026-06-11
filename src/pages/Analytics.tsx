@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
+import { Trophy, Target, TrendingUp, Zap } from 'lucide-react'
 import { supabase } from '../supabase'
 
 interface WorkoutExerciseRow {
@@ -21,6 +22,7 @@ interface WeekData {
 export default function Analytics() {
   const [rows, setRows] = useState<WorkoutExerciseRow[]>([])
   const [weeklyData, setWeeklyData] = useState<WeekData[]>([])
+  const [totalWorkouts, setTotalWorkouts] = useState(0)
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -72,8 +74,11 @@ export default function Analytics() {
       }
     }
 
-    if (workoutsRes.data && weRes.data) {
-      setWeeklyData(buildWeeklyData(workoutsRes.data, weRes.data as unknown as WorkoutExerciseRow[]))
+    if (workoutsRes.data) {
+      setTotalWorkouts(workoutsRes.data.length)
+      if (weRes.data) {
+        setWeeklyData(buildWeeklyData(workoutsRes.data, weRes.data as unknown as WorkoutExerciseRow[]))
+      }
     }
 
     setLoading(false)
@@ -169,13 +174,40 @@ export default function Analytics() {
     return Array.from(maxByExercise.entries())
       .map(([key, data]) => ({ key, ...data }))
       .sort((a, b) => b.weight - a.weight)
-      .slice(0, 10)
+      .slice(0, 8)
   }, [rows])
+
+  const kpis = useMemo(() => {
+    const heaviestLift = personalBests.length > 0 ? personalBests[0].weight : 0
+    const muscleGroupCounts = new Map<string, number>()
+    for (const r of rows) {
+      muscleGroupCounts.set(r.muscle_group_snapshot, (muscleGroupCounts.get(r.muscle_group_snapshot) || 0) + 1)
+    }
+    let topMuscle = '-'
+    let topCount = 0
+    for (const [group, count] of muscleGroupCounts) {
+      if (count > topCount) {
+        topMuscle = group
+        topCount = count
+      }
+    }
+
+    // Calculate streak (consecutive weeks with workouts)
+    let streak = 0
+    if (weeklyData.length > 0) {
+      for (let i = weeklyData.length - 1; i >= 0; i--) {
+        if (weeklyData[i].count > 0) streak++
+        else break
+      }
+    }
+
+    return { heaviestLift, topMuscle, streak }
+  }, [rows, personalBests, weeklyData])
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -183,10 +215,10 @@ export default function Analytics() {
   const hasData = rows.length > 0
 
   return (
-    <div className="px-5 pt-12 pb-6">
-      <header className="mb-6">
+    <div className="px-5 pt-10 pb-6">
+      <header className="mb-5">
         <h1 className="text-xl font-bold text-white">Progress</h1>
-        <p className="text-slate-500 text-sm mt-1">Track your gains over time</p>
+        <p className="text-slate-500 text-sm mt-0.5">Track your gains over time</p>
       </header>
 
       {!hasData ? (
@@ -194,12 +226,21 @@ export default function Analytics() {
           <p className="text-sm">Complete some workouts to see your progress here.</p>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-5">
+          {/* KPI Cards */}
+          <div className="grid grid-cols-4 gap-2">
+            <KpiCard icon={<Target size={14} className="text-sky-400" />} value={totalWorkouts.toString()} label="Workouts" />
+            <KpiCard icon={<Zap size={14} className="text-amber-400" />} value={`${kpis.streak}w`} label="Streak" />
+            <KpiCard icon={<Trophy size={14} className="text-green-400" />} value={`${kpis.heaviestLift}`} label="Max (kg)" />
+            <KpiCard icon={<TrendingUp size={14} className="text-orange-400" />} value={kpis.topMuscle} label="Top Group" />
+          </div>
+
+          {/* Weekly Workouts */}
           <section>
-            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2.5">
               Weekly Workouts
             </h2>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
               {weeklyData.length < 2 ? (
                 <p className="text-slate-500 text-sm text-center py-4">Need at least 2 weeks of data</p>
               ) : (
@@ -212,11 +253,12 @@ export default function Analytics() {
             </div>
           </section>
 
+          {/* Weekly Volume */}
           <section>
-            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2.5">
               Weekly Volume
             </h2>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
               {weeklyData.length < 2 ? (
                 <p className="text-slate-500 text-sm text-center py-4">Need at least 2 weeks of data</p>
               ) : (
@@ -229,40 +271,50 @@ export default function Analytics() {
             </div>
           </section>
 
+          {/* Exercise Progress */}
           <section>
-            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">
-              Exercise Progress (Max Weight)
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2.5">
+              Exercise Progress
             </h2>
             <select
               value={selectedExercise || ''}
               onChange={(e) => setSelectedExercise(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-white text-sm mb-3 focus:outline-none focus:border-green-600 appearance-none"
+              className="w-full px-3 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-white text-sm mb-2.5 focus:outline-none focus:border-green-600 appearance-none"
             >
               {exerciseOptions.map((e) => (
                 <option key={e.key} value={e.key}>{e.name}</option>
               ))}
             </select>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
               {exerciseProgress.length < 2 ? (
                 <p className="text-slate-500 text-sm text-center py-4">Need at least 2 sessions to chart</p>
               ) : (
-                <LineChart
-                  data={exerciseProgress.map((p) => ({
-                    label: formatShortDate(p.date),
-                    value: p.maxWeight,
-                  }))}
-                />
+                <>
+                  <div className="flex justify-between items-baseline mb-3">
+                    <span className="text-[10px] text-slate-500 uppercase">Current max</span>
+                    <span className="text-sm font-bold text-green-400">
+                      {exerciseProgress[exerciseProgress.length - 1].maxWeight} kg
+                    </span>
+                  </div>
+                  <LineChart
+                    data={exerciseProgress.map((p) => ({
+                      label: formatShortDate(p.date),
+                      value: p.maxWeight,
+                    }))}
+                  />
+                </>
               )}
             </div>
           </section>
 
+          {/* Personal Bests */}
           <section>
-            <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-3">
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2.5">
               Personal Bests
             </h2>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {personalBests.map((pb) => (
-                <div key={pb.key} className="flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-xl">
+                <div key={pb.key} className="flex items-center justify-between p-3 bg-slate-900 border border-slate-800 rounded-lg">
                   <div>
                     <p className="text-sm font-medium text-white">{pb.name}</p>
                     <p className="text-[10px] text-slate-500 uppercase">{pb.group}</p>
@@ -274,6 +326,16 @@ export default function Analytics() {
           </section>
         </div>
       )}
+    </div>
+  )
+}
+
+function KpiCard({ icon, value, label }: { icon: React.ReactNode; value: string; label: string }) {
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-center">
+      <div className="flex justify-center mb-0.5">{icon}</div>
+      <p className="text-sm font-bold text-white leading-tight truncate">{value}</p>
+      <p className="text-[8px] text-slate-500 uppercase tracking-wide mt-0.5">{label}</p>
     </div>
   )
 }
@@ -291,16 +353,16 @@ function BarChart({ data, color, unit }: { data: { label: string; value: number 
 
   return (
     <div>
-      <div className="flex items-end justify-between gap-1.5 h-28">
+      <div className="flex items-end justify-between gap-1.5 h-24">
         {data.map((d, i) => (
           <div key={i} className="flex-1 flex flex-col items-center justify-end h-full">
             <span className="text-[9px] text-slate-400 mb-1 font-medium">{d.value}</span>
             <div
-              className="w-full rounded-t-md min-h-[4px]"
+              className="w-full rounded-t min-h-[4px]"
               style={{
                 height: `${(d.value / maxValue) * 100}%`,
                 backgroundColor: color,
-                opacity: 0.7 + (i / data.length) * 0.3,
+                opacity: 0.6 + (i / data.length) * 0.4,
               }}
             />
           </div>
@@ -311,7 +373,7 @@ function BarChart({ data, color, unit }: { data: { label: string; value: number 
           <span key={i} className="flex-1 text-[8px] text-slate-600 text-center truncate">{d.label}</span>
         ))}
       </div>
-      <p className="text-[10px] text-slate-600 text-right mt-1">{unit}</p>
+      <p className="text-[9px] text-slate-600 text-right mt-0.5">{unit}</p>
     </div>
   )
 }
@@ -321,9 +383,9 @@ function LineChart({ data }: { data: { label: string; value: number }[] }) {
   const min = Math.min(...values)
   const max = Math.max(...values)
   const range = max - min || 1
-  const height = 120
+  const height = 100
   const width = 280
-  const pad = 10
+  const pad = 8
 
   const points = data.map((d, i) => ({
     x: pad + (i / (data.length - 1)) * (width - pad * 2),
@@ -335,26 +397,22 @@ function LineChart({ data }: { data: { label: string; value: number }[] }) {
 
   return (
     <div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-28">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-24">
         <defs>
           <linearGradient id="areaFill" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#22c55e" stopOpacity="0.25" />
+            <stop offset="0%" stopColor="#22c55e" stopOpacity="0.2" />
             <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
           </linearGradient>
         </defs>
         <path d={areaD} fill="url(#areaFill)" />
         <path d={pathD} fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         {points.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r="3" fill="#22c55e" />
+          <circle key={i} cx={p.x} cy={p.y} r="2.5" fill="#22c55e" />
         ))}
       </svg>
       <div className="flex justify-between mt-1">
         <span className="text-[9px] text-slate-500">{data[0].label}</span>
         <span className="text-[9px] text-slate-500">{data[data.length - 1].label}</span>
-      </div>
-      <div className="flex justify-between mt-1">
-        <span className="text-[10px] text-slate-400">Low: <span className="text-white font-medium">{min} kg</span></span>
-        <span className="text-[10px] text-slate-400">High: <span className="text-green-400 font-medium">{max} kg</span></span>
       </div>
     </div>
   )

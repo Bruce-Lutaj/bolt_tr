@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Trash2 } from 'lucide-react'
+import { ArrowLeft, Trash2, RotateCcw } from 'lucide-react'
 import { supabase } from '../supabase'
+import { saveDraft, type WorkoutDraft } from '../lib/workoutDraft'
 import type { WorkoutWithExercises } from '../types'
 
 export default function WorkoutDetail() {
@@ -31,10 +32,41 @@ export default function WorkoutDetail() {
     navigate('/history')
   }
 
+  function repeatWorkout() {
+    if (!workout) return
+    const sortedExercises = [...workout.workout_exercises].sort((a, b) => a.position - b.position)
+
+    const draft: WorkoutDraft = {
+      version: 1,
+      name: '',
+      startedAt: new Date().toISOString(),
+      exercises: sortedExercises.map((we) => ({
+        id: crypto.randomUUID(),
+        exercise: {
+          id: we.exercise_id ?? crypto.randomUUID(),
+          name: we.exercise_name_snapshot,
+          muscle_group: we.muscle_group_snapshot,
+          is_custom: false,
+          archived_at: null,
+          created_at: '',
+        },
+        sets: [...we.workout_sets]
+          .sort((a, b) => a.set_number - b.set_number)
+          .map((s) => ({
+            id: crypto.randomUUID(),
+            reps: s.reps.toString(),
+            weight: s.weight_kg.toString(),
+          })),
+      })),
+    }
+    saveDraft(draft)
+    navigate('/workout')
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -55,27 +87,37 @@ export default function WorkoutDetail() {
   )
 
   return (
-    <div className="px-5 pt-12 pb-6">
-      <header className="flex items-center justify-between mb-6">
+    <div className="px-5 pt-10 pb-6">
+      <header className="flex items-center justify-between mb-5">
         <button
           onClick={() => navigate(-1)}
           className="p-2 -ml-2 text-slate-400 hover:text-white transition-colors"
         >
           <ArrowLeft size={20} />
         </button>
-        <button
-          onClick={deleteWorkout}
-          disabled={deleting}
-          className="p-2 text-slate-600 hover:text-red-400 transition-colors"
-        >
-          <Trash2 size={18} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={repeatWorkout}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-green-400 hover:text-green-300 bg-green-600/10 hover:bg-green-600/20 rounded-lg transition-colors"
+            title="Repeat this workout"
+          >
+            <RotateCcw size={14} />
+            Repeat
+          </button>
+          <button
+            onClick={deleteWorkout}
+            disabled={deleting}
+            className="p-2 text-slate-600 hover:text-red-400 transition-colors"
+          >
+            <Trash2 size={17} />
+          </button>
+        </div>
       </header>
 
-      <div className="mb-6">
+      <div className="mb-5">
         <h1 className="text-xl font-bold text-white">{workout.name}</h1>
         {workout.completed_at && (
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-slate-500 mt-0.5">
             {new Date(workout.completed_at).toLocaleDateString('en-US', {
               weekday: 'long',
               month: 'long',
@@ -86,31 +128,35 @@ export default function WorkoutDetail() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
-          <p className="text-lg font-bold text-white">{totalSets}</p>
-          <p className="text-[10px] text-slate-500 uppercase">Total Sets</p>
+      <div className="grid grid-cols-3 gap-2.5 mb-5">
+        <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 text-center">
+          <p className="text-lg font-bold text-white">{sortedExercises.length}</p>
+          <p className="text-[9px] text-slate-500 uppercase">Exercises</p>
         </div>
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 text-center">
+        <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 text-center">
+          <p className="text-lg font-bold text-white">{totalSets}</p>
+          <p className="text-[9px] text-slate-500 uppercase">Sets</p>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 text-center">
           <p className="text-lg font-bold text-white">
             {totalVolume >= 1000 ? `${(totalVolume / 1000).toFixed(1)}K` : Math.round(totalVolume)}
           </p>
-          <p className="text-[10px] text-slate-500 uppercase">Volume (kg)</p>
+          <p className="text-[9px] text-slate-500 uppercase">Volume (kg)</p>
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {sortedExercises.map((we) => (
-          <div key={we.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <div key={we.id} className="bg-slate-900 border border-slate-800 rounded-lg p-4">
             <div className="mb-3">
               <p className="font-semibold text-white text-sm">{we.exercise_name_snapshot}</p>
-              <p className="text-[10px] text-slate-500 uppercase">{we.muscle_group_snapshot}</p>
+              <p className="text-[10px] text-slate-500 uppercase tracking-wide">{we.muscle_group_snapshot}</p>
             </div>
 
             <div className="grid grid-cols-3 gap-2 mb-2">
-              <span className="text-[10px] text-slate-600 text-center">SET</span>
-              <span className="text-[10px] text-slate-600 text-center">KG</span>
-              <span className="text-[10px] text-slate-600 text-center">REPS</span>
+              <span className="text-[10px] text-slate-600 text-center font-medium">SET</span>
+              <span className="text-[10px] text-slate-600 text-center font-medium">KG</span>
+              <span className="text-[10px] text-slate-600 text-center font-medium">REPS</span>
             </div>
 
             {[...we.workout_sets]

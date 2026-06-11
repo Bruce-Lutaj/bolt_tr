@@ -14,6 +14,10 @@
   --color-green-400: #4ade80;
   --color-green-600: #16a34a;
   --color-green-700: #15803d;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;
+  --color-sky-400: #38bdf8;
+  --color-orange-400: #fb923c;
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 }
 
@@ -34,4 +38,12 @@ input[type="number"]::-webkit-outer-spin-button {
 
 input[type="number"] {
   -moz-appearance: textfield;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
