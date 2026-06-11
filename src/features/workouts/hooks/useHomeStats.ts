@@ -26,7 +26,13 @@ export function useHomeStats() {
       fetchTotalVolume(),
     ])
 
-    if (workoutsRes.error) setError(workoutsRes.error)
+    const errors: string[] = []
+    if (workoutsRes.error) errors.push(workoutsRes.error)
+    if (weekRes.error) errors.push(weekRes.error)
+    if (totalRes.error) errors.push(totalRes.error)
+    if (volumeRes.error) errors.push(volumeRes.error)
+
+    if (errors.length > 0) setError(errors.join('. '))
     if (workoutsRes.data) setRecentWorkouts(workoutsRes.data)
 
     setStats({

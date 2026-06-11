@@ -1,5 +1,3 @@
-import type { Exercise } from '../exercises/types'
-
 export interface Workout {
   id: string
   name: string
@@ -41,9 +39,18 @@ export interface DraftSet {
   weight: string
 }
 
+export interface DraftExerciseInfo {
+  id: string | null
+  name: string
+  muscle_group: string
+  is_custom: boolean
+  archived_at: string | null
+  created_at: string
+}
+
 export interface DraftExercise {
   id: string
-  exercise: Exercise
+  exercise: DraftExerciseInfo
   sets: DraftSet[]
 }
 

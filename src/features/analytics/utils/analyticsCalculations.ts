@@ -109,15 +109,34 @@ export function computeKpis(
     }
   }
 
-  let streak = 0
-  if (weeklyData.length > 0) {
-    for (let i = weeklyData.length - 1; i >= 0; i--) {
-      if (weeklyData[i].count > 0) streak++
-      else break
-    }
-  }
+  const streak = computeWeeklyStreak(weeklyData)
 
   return { heaviestLift, topMuscle, streak }
+}
+
+function computeWeeklyStreak(weeklyData: WeekData[]): number {
+  if (weeklyData.length === 0) return 0
+
+  const weekMap = new Map<string, number>()
+  for (const w of weeklyData) {
+    weekMap.set(w.week, w.count)
+  }
+
+  const latestWeek = weeklyData[weeklyData.length - 1]
+  if (latestWeek.count === 0) return 0
+
+  let streak = 0
+  const current = new Date(latestWeek.week)
+
+  while (true) {
+    const key = current.toISOString().slice(0, 10)
+    const count = weekMap.get(key)
+    if (count === undefined || count === 0) break
+    streak++
+    current.setDate(current.getDate() - 7)
+  }
+
+  return streak
 }
 
 export function getMostUsedExercise(rows: WorkoutExerciseRow[]): string | null {

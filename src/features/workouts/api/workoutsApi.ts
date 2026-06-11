@@ -104,6 +104,14 @@ export async function fetchAllWorkoutsWithSets(): Promise<{ data: { id: string; 
 }
 
 export async function createWorkout(name: string, startedAt: string, entries: DraftExercise[]): Promise<{ data: { id: string } | null; error: string | null }> {
+  const validEntries = entries.filter(
+    (entry) => entry.sets.some((s) => s.reps !== '' && s.weight !== '')
+  )
+
+  if (validEntries.length === 0) {
+    return { data: null, error: 'No valid sets to save' }
+  }
+
   const now = new Date().toISOString()
 
   const { data: workout, error: workoutErr } = await supabase
@@ -116,9 +124,11 @@ export async function createWorkout(name: string, startedAt: string, entries: Dr
     return { data: null, error: workoutErr?.message ?? 'Failed to create workout' }
   }
 
-  const workoutExercises = entries.map((entry, idx) => ({
-    workout_id: (workout as { id: string }).id,
-    exercise_id: entry.exercise.id,
+  const workoutId = (workout as { id: string }).id
+
+  const workoutExercises = validEntries.map((entry, idx) => ({
+    workout_id: workoutId,
+    exercise_id: entry.exercise.id ?? null,
     exercise_name_snapshot: entry.exercise.name,
     muscle_group_snapshot: entry.exercise.muscle_group,
     position: idx + 1,
@@ -130,10 +140,11 @@ export async function createWorkout(name: string, startedAt: string, entries: Dr
     .select()
 
   if (exErr || !insertedExercises) {
+    await supabase.from('workouts').delete().eq('id', workoutId)
     return { data: null, error: exErr?.message ?? 'Failed to save exercises' }
   }
 
-  const sets = entries.flatMap((entry, entryIdx) => {
+  const sets = validEntries.flatMap((entry, entryIdx) => {
     const workoutExercise = insertedExercises[entryIdx] as { id: string }
     return entry.sets
       .filter((s) => s.reps !== '' && s.weight !== '')
@@ -147,10 +158,13 @@ export async function createWorkout(name: string, startedAt: string, entries: Dr
 
   if (sets.length > 0) {
     const { error: setsErr } = await supabase.from('workout_sets').insert(sets)
-    if (setsErr) return { data: null, error: setsErr.message }
+    if (setsErr) {
+      await supabase.from('workouts').delete().eq('id', workoutId)
+      return { data: null, error: setsErr.message }
+    }
   }
 
-  return { data: { id: (workout as { id: string }).id }, error: null }
+  return { data: { id: workoutId }, error: null }
 }
 
 export async function deleteWorkout(id: string): Promise<{ error: string | null }> {

@@ -2,9 +2,8 @@ import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fetchWorkoutForRepeat } from '../api/workoutsApi'
 import { ROUTES } from '../../../shared/routes'
+import { ACTIVE_WORKOUT_DRAFT_KEY } from '../constants'
 import type { WorkoutDraft } from '../types'
-
-const STORAGE_KEY = 'gymtrack.activeWorkoutDraft'
 
 export function useRepeatWorkout() {
   const navigate = useNavigate()
@@ -26,7 +25,7 @@ export function useRepeatWorkout() {
       exercises: result.data.map((we) => ({
         id: crypto.randomUUID(),
         exercise: {
-          id: we.exercise_id ?? crypto.randomUUID(),
+          id: we.exercise_id,
           name: we.exercise_name_snapshot,
           muscle_group: we.muscle_group_snapshot,
           is_custom: false,
@@ -43,7 +42,7 @@ export function useRepeatWorkout() {
       })),
     }
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(draft))
+    localStorage.setItem(ACTIVE_WORKOUT_DRAFT_KEY, JSON.stringify(draft))
     navigate(ROUTES.workout)
     setLoading(false)
   }, [navigate])

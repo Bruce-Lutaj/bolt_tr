@@ -4,13 +4,12 @@ import { workoutDraftReducer, initialDraftState } from '../state/workoutDraftRed
 import { createWorkout } from '../api/workoutsApi'
 import { countValidDraftSets } from '../utils/workoutCalculations'
 import { ROUTES } from '../../../shared/routes'
+import { ACTIVE_WORKOUT_DRAFT_KEY } from '../constants'
 import type { WorkoutDraft, DraftExercise } from '../types'
 import type { Exercise } from '../../exercises/types'
 
-const STORAGE_KEY = 'gymtrack.activeWorkoutDraft'
-
 function loadFromStorage(): { name: string; startedAt: string; exercises: DraftExercise[] } | null {
-  const raw = localStorage.getItem(STORAGE_KEY)
+  const raw = localStorage.getItem(ACTIVE_WORKOUT_DRAFT_KEY)
   if (!raw) return null
   try {
     const parsed = JSON.parse(raw) as WorkoutDraft
@@ -23,19 +22,19 @@ function loadFromStorage(): { name: string; startedAt: string; exercises: DraftE
 
 function saveToStorage(name: string, startedAt: string, exercises: DraftExercise[]): void {
   const draft: WorkoutDraft = { version: 1, name, startedAt, exercises }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(draft))
+  localStorage.setItem(ACTIVE_WORKOUT_DRAFT_KEY, JSON.stringify(draft))
 }
 
 export function clearDraftStorage(): void {
-  localStorage.removeItem(STORAGE_KEY)
+  localStorage.removeItem(ACTIVE_WORKOUT_DRAFT_KEY)
 }
 
 export function hasDraft(): boolean {
-  return localStorage.getItem(STORAGE_KEY) !== null
+  return localStorage.getItem(ACTIVE_WORKOUT_DRAFT_KEY) !== null
 }
 
 export function getDraftSummary(): { exerciseCount: number; setCount: number; startedAt: string } | null {
-  const raw = localStorage.getItem(STORAGE_KEY)
+  const raw = localStorage.getItem(ACTIVE_WORKOUT_DRAFT_KEY)
   if (!raw) return null
   try {
     const parsed = JSON.parse(raw) as WorkoutDraft

@@ -1,4 +1,4 @@
-import type { DraftExercise, DraftSet } from '../types'
+import type { DraftExercise, DraftSet, DraftExerciseInfo } from '../types'
 import type { Exercise } from '../../exercises/types'
 
 export interface DraftState {
@@ -33,9 +33,18 @@ export function workoutDraftReducer(state: DraftState, action: DraftAction): Dra
       return { ...state, name: action.payload }
 
     case 'ADD_EXERCISE': {
+      const ex = action.payload
+      const info: DraftExerciseInfo = {
+        id: ex.id,
+        name: ex.name,
+        muscle_group: ex.muscle_group,
+        is_custom: ex.is_custom,
+        archived_at: ex.archived_at,
+        created_at: ex.created_at,
+      }
       const newEntry: DraftExercise = {
         id: crypto.randomUUID(),
-        exercise: action.payload,
+        exercise: info,
         sets: [{ id: crypto.randomUUID(), reps: '', weight: '' }],
       }
       return { ...state, exercises: [...state.exercises, newEntry] }
