@@ -1,5 +1,6 @@
 import { supabase } from '../../../lib/supabase/client'
 import { isGuestMode } from '../../guest/guestStore'
+import { isSmartUserMode, suFetchAnalyticsData } from '../../smartuser/smartUserStore'
 import type { WorkoutExerciseRow } from '../types'
 
 function guestFetchAnalyticsData(): {
@@ -48,6 +49,7 @@ export async function fetchAnalyticsData(): Promise<{
   error: string | null
 }> {
   if (isGuestMode()) return guestFetchAnalyticsData()
+  if (isSmartUserMode()) return suFetchAnalyticsData()
 
   const [weRes, workoutsRes] = await Promise.all([
     supabase

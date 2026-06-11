@@ -7,7 +7,7 @@ import { formatDate, formatVolume } from '../shared/formatters'
 import { LoadingSpinner, StatCard, EmptyState, InlineError } from '../components/ui'
 
 export default function Home() {
-  const { user, isGuest, logout } = useAuth()
+  const { user, isGuest, provider, logout } = useAuth()
   const navigate = useNavigate()
   const userId = user?.id ?? 'guest'
   const { recentWorkouts, stats, loading, error } = useHomeStats()
@@ -21,7 +21,12 @@ export default function Home() {
         <div>
           <h1 className="text-2xl font-bold text-white">GymTrack</h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            {isGuest ? 'Guest mode' : (user?.displayName || user?.email)}
+            {isGuest
+              ? 'Guest mode'
+              : provider === 'smartuser'
+                ? 'SmartUser account'
+                : (user?.displayName || user?.email)
+            }
           </p>
         </div>
         {isGuest ? (

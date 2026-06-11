@@ -2,10 +2,12 @@ import { supabase } from '../../../lib/supabase/client'
 import { getCurrentUserId } from '../../auth/api/authApi'
 import { isGuestMode } from '../../guest/guestStore'
 import { guestFetchAllExercises, guestFetchRecentExercises, guestCreateExercise, guestArchiveExercise } from '../../guest/guestExercisesStore'
+import { isSmartUserMode, suFetchAllExercises, suFetchRecentExercises, suCreateExercise, suArchiveExercise } from '../../smartuser/smartUserStore'
 import type { Exercise } from '../types'
 
 export async function fetchAllExercises(): Promise<{ data: Exercise[] | null; error: string | null }> {
   if (isGuestMode()) return guestFetchAllExercises()
+  if (isSmartUserMode()) return suFetchAllExercises()
 
   const accountId = await getCurrentUserId()
   if (!accountId) return { data: null, error: 'Not authenticated' }
@@ -23,6 +25,7 @@ export async function fetchAllExercises(): Promise<{ data: Exercise[] | null; er
 
 export async function fetchRecentExercises(limit = 20): Promise<{ data: Exercise[] | null; error: string | null }> {
   if (isGuestMode()) return guestFetchRecentExercises()
+  if (isSmartUserMode()) return suFetchRecentExercises()
 
   const accountId = await getCurrentUserId()
   if (!accountId) return { data: null, error: 'Not authenticated' }
@@ -51,6 +54,7 @@ export async function fetchRecentExercises(limit = 20): Promise<{ data: Exercise
 
 export async function createExercise(name: string, muscleGroup: string): Promise<{ data: Exercise | null; error: string | null }> {
   if (isGuestMode()) return guestCreateExercise(name, muscleGroup)
+  if (isSmartUserMode()) return suCreateExercise(name, muscleGroup)
 
   const accountId = await getCurrentUserId()
   if (!accountId) {
@@ -68,6 +72,7 @@ export async function createExercise(name: string, muscleGroup: string): Promise
 
 export async function archiveExercise(id: string): Promise<{ error: string | null }> {
   if (isGuestMode()) return guestArchiveExercise(id)
+  if (isSmartUserMode()) return suArchiveExercise(id)
 
   const accountId = await getCurrentUserId()
   if (!accountId) return { error: 'Not authenticated' }

@@ -1,13 +1,16 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Dumbbell, Mail, Lock, User, ArrowRight } from 'lucide-react'
+import { Dumbbell, Mail, Lock, User, ArrowRight, Shield } from 'lucide-react'
 import { useAuth } from '../features/auth'
 import { ROUTES } from '../shared/routes'
 
+type AuthMethod = 'smartuser' | 'supabase'
+
 export default function Login() {
-  const { login, signup, enterGuest } = useAuth()
+  const { login, signup, loginWithSmartUser, signupWithSmartUser, enterGuest } = useAuth()
   const navigate = useNavigate()
   const [mode, setMode] = useState<'login' | 'signup'>('login')
+  const [authMethod, setAuthMethod] = useState<AuthMethod>('smartuser')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
@@ -26,23 +29,43 @@ export default function Login() {
     setInfoMessage(null)
     setSubmitting(true)
 
-    if (mode === 'login') {
-      const err = await login(email, password)
-      setSubmitting(false)
-      if (err) {
-        setError(err)
+    if (authMethod === 'smartuser') {
+      if (mode === 'login') {
+        const err = await loginWithSmartUser(email, password)
+        setSubmitting(false)
+        if (err) {
+          setError(err)
+        } else {
+          navigate(ROUTES.home, { replace: true })
+        }
       } else {
-        navigate(ROUTES.home, { replace: true })
+        const err = await signupWithSmartUser(email, password)
+        setSubmitting(false)
+        if (err) {
+          setError(err)
+        } else {
+          navigate(ROUTES.home, { replace: true })
+        }
       }
     } else {
-      const result = await signup(email, password, displayName.trim() || undefined)
-      setSubmitting(false)
-      if (result.error) {
-        setError(result.error)
-      } else if (result.needsConfirmation) {
-        setInfoMessage('Check your email to confirm your account.')
+      if (mode === 'login') {
+        const err = await login(email, password)
+        setSubmitting(false)
+        if (err) {
+          setError(err)
+        } else {
+          navigate(ROUTES.home, { replace: true })
+        }
       } else {
-        navigate(ROUTES.home, { replace: true })
+        const result = await signup(email, password, displayName.trim() || undefined)
+        setSubmitting(false)
+        if (result.error) {
+          setError(result.error)
+        } else if (result.needsConfirmation) {
+          setInfoMessage('Check your email to confirm your account.')
+        } else {
+          navigate(ROUTES.home, { replace: true })
+        }
       }
     }
   }
@@ -58,22 +81,36 @@ export default function Login() {
           <p className="text-slate-500 text-sm mt-1">Track workouts. See progress.</p>
         </div>
 
-        <button
-          onClick={handleGuest}
-          className="flex items-center justify-center gap-2 w-full h-12 bg-green-600 hover:bg-green-500 text-white font-semibold rounded-lg transition-colors text-sm active:scale-[0.98]"
-        >
-          Continue as Guest
-          <ArrowRight size={16} />
-        </button>
-
-        <div className="flex items-center gap-3 my-6">
-          <div className="flex-1 h-px bg-slate-800" />
-          <span className="text-xs text-slate-500">or sign in to save across devices</span>
-          <div className="flex-1 h-px bg-slate-800" />
+        {/* Auth method tabs */}
+        <div className="flex gap-1 p-1 bg-slate-900 rounded-lg mb-5 border border-slate-800">
+          <button
+            type="button"
+            onClick={() => { setAuthMethod('smartuser'); setError(null); setInfoMessage(null) }}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md text-xs font-medium transition-colors ${
+              authMethod === 'smartuser'
+                ? 'bg-green-600/20 text-green-400 border border-green-500/30'
+                : 'text-slate-400 hover:text-slate-300'
+            }`}
+          >
+            <Shield size={13} />
+            SmartUser
+          </button>
+          <button
+            type="button"
+            onClick={() => { setAuthMethod('supabase'); setError(null); setInfoMessage(null) }}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md text-xs font-medium transition-colors ${
+              authMethod === 'supabase'
+                ? 'bg-green-600/20 text-green-400 border border-green-500/30'
+                : 'text-slate-400 hover:text-slate-300'
+            }`}
+          >
+            <Mail size={13} />
+            Email
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {mode === 'signup' && (
+          {mode === 'signup' && authMethod === 'supabase' && (
             <div className="relative">
               <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
               <input
@@ -126,20 +163,23 @@ export default function Login() {
           <button
             type="submit"
             disabled={submitting}
-            className="flex items-center justify-center gap-2 w-full h-12 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-800/50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors text-sm border border-slate-700"
+            className="flex items-center justify-center gap-2 w-full h-12 bg-green-600 hover:bg-green-500 disabled:bg-green-600/50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors text-sm active:scale-[0.98]"
           >
             {submitting ? (
               <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
               <>
-                {mode === 'login' ? 'Sign In' : 'Create Account'}
+                {mode === 'login'
+                  ? (authMethod === 'smartuser' ? 'Continue with SmartUser' : 'Sign In')
+                  : (authMethod === 'smartuser' ? 'Sign Up with SmartUser' : 'Create Account')
+                }
                 <ArrowRight size={16} />
               </>
             )}
           </button>
         </form>
 
-        <div className="mt-6 text-center">
+        <div className="mt-4 text-center">
           <button
             type="button"
             onClick={() => {
@@ -152,6 +192,20 @@ export default function Login() {
             {mode === 'login' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
           </button>
         </div>
+
+        <div className="flex items-center gap-3 my-5">
+          <div className="flex-1 h-px bg-slate-800" />
+          <span className="text-xs text-slate-500">or</span>
+          <div className="flex-1 h-px bg-slate-800" />
+        </div>
+
+        <button
+          onClick={handleGuest}
+          className="flex items-center justify-center gap-2 w-full h-11 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-lg transition-colors text-sm border border-slate-700"
+        >
+          Continue as Guest
+          <ArrowRight size={14} />
+        </button>
       </div>
     </div>
   )

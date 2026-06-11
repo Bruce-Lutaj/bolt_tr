@@ -1,10 +1,12 @@
 import { supabase } from '../../../lib/supabase/client'
 import { getCurrentUserId } from '../../auth/api/authApi'
 import { isGuestMode, guestFetchRecentWorkouts, guestFetchTotalWorkoutCount, guestFetchWeeklyWorkoutCount, guestFetchTotalVolume, guestFetchWorkoutById, guestFetchWorkoutForRepeat, guestFetchAllWorkoutsWithSets, guestCreateWorkout, guestDeleteWorkout } from '../../guest/guestStore'
+import { isSmartUserMode, suFetchRecentWorkouts, suFetchTotalWorkoutCount, suFetchWeeklyWorkoutCount, suFetchTotalVolume, suFetchWorkoutById, suFetchWorkoutForRepeat, suFetchAllWorkoutsWithSets, suCreateWorkout, suDeleteWorkout } from '../../smartuser/smartUserStore'
 import type { Workout, WorkoutWithExercises, DraftExercise } from '../types'
 
 export async function fetchRecentWorkouts(limit = 3): Promise<{ data: Workout[] | null; error: string | null }> {
   if (isGuestMode()) return guestFetchRecentWorkouts(limit)
+  if (isSmartUserMode()) return suFetchRecentWorkouts(limit)
 
   const accountId = await getCurrentUserId()
   if (!accountId) return { data: null, error: 'Not authenticated' }
@@ -22,6 +24,7 @@ export async function fetchRecentWorkouts(limit = 3): Promise<{ data: Workout[] 
 
 export async function fetchTotalWorkoutCount(): Promise<{ data: number; error: string | null }> {
   if (isGuestMode()) return guestFetchTotalWorkoutCount()
+  if (isSmartUserMode()) return suFetchTotalWorkoutCount()
 
   const accountId = await getCurrentUserId()
   if (!accountId) return { data: 0, error: 'Not authenticated' }
@@ -37,6 +40,7 @@ export async function fetchTotalWorkoutCount(): Promise<{ data: number; error: s
 
 export async function fetchWeeklyWorkoutCount(): Promise<{ data: number; error: string | null }> {
   if (isGuestMode()) return guestFetchWeeklyWorkoutCount()
+  if (isSmartUserMode()) return suFetchWeeklyWorkoutCount()
 
   const accountId = await getCurrentUserId()
   if (!accountId) return { data: 0, error: 'Not authenticated' }
@@ -56,6 +60,7 @@ export async function fetchWeeklyWorkoutCount(): Promise<{ data: number; error: 
 
 export async function fetchTotalVolume(): Promise<{ data: number; error: string | null }> {
   if (isGuestMode()) return guestFetchTotalVolume()
+  if (isSmartUserMode()) return suFetchTotalVolume()
 
   const accountId = await getCurrentUserId()
   if (!accountId) return { data: 0, error: 'Not authenticated' }
@@ -72,6 +77,7 @@ export async function fetchTotalVolume(): Promise<{ data: number; error: string 
 
 export async function fetchWorkoutById(id: string): Promise<{ data: WorkoutWithExercises | null; error: string | null }> {
   if (isGuestMode()) return guestFetchWorkoutById(id)
+  if (isSmartUserMode()) return suFetchWorkoutById(id)
 
   const accountId = await getCurrentUserId()
   if (!accountId) return { data: null, error: 'Not authenticated' }
@@ -96,6 +102,7 @@ interface RepeatExerciseRow {
 
 export async function fetchWorkoutForRepeat(workoutId: string): Promise<{ data: RepeatExerciseRow[] | null; error: string | null }> {
   if (isGuestMode()) return guestFetchWorkoutForRepeat(workoutId)
+  if (isSmartUserMode()) return suFetchWorkoutForRepeat(workoutId)
 
   const accountId = await getCurrentUserId()
   if (!accountId) return { data: null, error: 'Not authenticated' }
@@ -118,6 +125,7 @@ interface WorkoutRow {
 
 export async function fetchAllWorkoutsWithSets(): Promise<{ data: { id: string; completed_at: string; exerciseCount: number; setCount: number; volume: number; name: string }[] | null; error: string | null }> {
   if (isGuestMode()) return guestFetchAllWorkoutsWithSets()
+  if (isSmartUserMode()) return suFetchAllWorkoutsWithSets()
 
   const accountId = await getCurrentUserId()
   if (!accountId) return { data: null, error: 'Not authenticated' }
@@ -147,6 +155,7 @@ export async function fetchAllWorkoutsWithSets(): Promise<{ data: { id: string; 
 
 export async function createWorkout(name: string, startedAt: string, entries: DraftExercise[]): Promise<{ data: { id: string } | null; error: string | null }> {
   if (isGuestMode()) return guestCreateWorkout(name, startedAt, entries)
+  if (isSmartUserMode()) return suCreateWorkout(name, startedAt, entries)
 
   const validEntries = entries.filter(
     (entry) => entry.sets.some((s) => s.reps !== '' && s.weight !== '')
@@ -218,6 +227,7 @@ export async function createWorkout(name: string, startedAt: string, entries: Dr
 
 export async function deleteWorkout(id: string): Promise<{ error: string | null }> {
   if (isGuestMode()) return guestDeleteWorkout(id)
+  if (isSmartUserMode()) return suDeleteWorkout(id)
 
   const accountId = await getCurrentUserId()
   if (!accountId) return { error: 'Not authenticated' }
