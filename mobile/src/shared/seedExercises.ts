@@ -1,0 +1,28 @@
+import type { Exercise } from './types';
+
+export const SEED_EXERCISES: Exercise[] = [
+  { id: 'seed-1', name: 'Bench Press', muscle_group: 'Chest', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-2', name: 'Incline Dumbbell Press', muscle_group: 'Chest', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-3', name: 'Cable Flyes', muscle_group: 'Chest', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-4', name: 'Barbell Squat', muscle_group: 'Legs', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-5', name: 'Leg Press', muscle_group: 'Legs', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-6', name: 'Romanian Deadlift', muscle_group: 'Legs', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-7', name: 'Leg Extension', muscle_group: 'Legs', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-8', name: 'Leg Curl', muscle_group: 'Legs', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-9', name: 'Calf Raises', muscle_group: 'Legs', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-10', name: 'Deadlift', muscle_group: 'Back', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-11', name: 'Pull Ups', muscle_group: 'Back', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-12', name: 'Barbell Row', muscle_group: 'Back', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-13', name: 'Lat Pulldown', muscle_group: 'Back', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-14', name: 'Seated Cable Row', muscle_group: 'Back', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-15', name: 'Overhead Press', muscle_group: 'Shoulders', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-16', name: 'Lateral Raises', muscle_group: 'Shoulders', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-17', name: 'Face Pulls', muscle_group: 'Shoulders', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-18', name: 'Barbell Curl', muscle_group: 'Arms', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-19', name: 'Tricep Pushdown', muscle_group: 'Arms', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-20', name: 'Hammer Curl', muscle_group: 'Arms', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-21', name: 'Skull Crushers', muscle_group: 'Arms', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-22', name: 'Plank', muscle_group: 'Core', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-23', name: 'Hanging Leg Raises', muscle_group: 'Core', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+  { id: 'seed-24', name: 'Russian Twists', muscle_group: 'Core', is_custom: false, archived_at: null, created_at: '2024-01-01T00:00:00Z' },
+];

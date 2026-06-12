@@ -3,47 +3,47 @@ import * as Crypto from 'expo-crypto';
 import { SEED_EXERCISES } from '../../shared/seedExercises';
 import type { Workout, WorkoutWithExercises, DraftExercise, Exercise } from '../../shared/types';
 
-const WORKOUTS_KEY = 'gymtrack.guest.workouts';
-const EXERCISES_KEY = 'gymtrack.guest.exercises';
-const ARCHIVED_KEY = 'gymtrack.guest.archivedExercises';
-
 interface StoredWorkout extends WorkoutWithExercises {
   account_id: string;
 }
 
-async function readWorkouts(): Promise<StoredWorkout[]> {
-  const raw = await AsyncStorage.getItem(WORKOUTS_KEY);
+function workoutsKey(userId: string) { return `gymtrack.smartuser.${userId}.workouts`; }
+function exercisesKey(userId: string) { return `gymtrack.smartuser.${userId}.exercises`; }
+function archivedKey(userId: string) { return `gymtrack.smartuser.${userId}.archivedExercises`; }
+
+async function readWorkouts(userId: string): Promise<StoredWorkout[]> {
+  const raw = await AsyncStorage.getItem(workoutsKey(userId));
   if (!raw) return [];
   try { return JSON.parse(raw) as StoredWorkout[]; } catch { return []; }
 }
 
-async function writeWorkouts(workouts: StoredWorkout[]): Promise<void> {
-  await AsyncStorage.setItem(WORKOUTS_KEY, JSON.stringify(workouts));
+async function writeWorkouts(userId: string, workouts: StoredWorkout[]): Promise<void> {
+  await AsyncStorage.setItem(workoutsKey(userId), JSON.stringify(workouts));
 }
 
-export async function guestFetchRecentWorkouts(limit = 3): Promise<{ data: Workout[] | null; error: string | null }> {
-  const all = (await readWorkouts())
+export async function smartUserFetchRecentWorkouts(userId: string, limit = 3): Promise<{ data: Workout[] | null; error: string | null }> {
+  const all = (await readWorkouts(userId))
     .filter((w) => w.completed_at !== null)
     .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime())
     .slice(0, limit);
   return { data: all.map(({ id, name, started_at, completed_at, created_at }) => ({ id, name, started_at, completed_at, created_at })), error: null };
 }
 
-export async function guestFetchTotalWorkoutCount(): Promise<{ data: number; error: string | null }> {
-  return { data: (await readWorkouts()).filter((w) => w.completed_at !== null).length, error: null };
+export async function smartUserFetchTotalWorkoutCount(userId: string): Promise<{ data: number; error: string | null }> {
+  return { data: (await readWorkouts(userId)).filter((w) => w.completed_at !== null).length, error: null };
 }
 
-export async function guestFetchWeeklyWorkoutCount(): Promise<{ data: number; error: string | null }> {
+export async function smartUserFetchWeeklyWorkoutCount(userId: string): Promise<{ data: number; error: string | null }> {
   const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
-  const count = (await readWorkouts()).filter(
+  const count = (await readWorkouts(userId)).filter(
     (w) => w.completed_at !== null && new Date(w.completed_at).getTime() >= weekAgo.getTime()
   ).length;
   return { data: count, error: null };
 }
 
-export async function guestFetchTotalVolume(): Promise<{ data: number; error: string | null }> {
+export async function smartUserFetchTotalVolume(userId: string): Promise<{ data: number; error: string | null }> {
   let volume = 0;
-  for (const w of (await readWorkouts()).filter((w) => w.completed_at !== null)) {
+  for (const w of (await readWorkouts(userId)).filter((w) => w.completed_at !== null)) {
     for (const we of w.workout_exercises) {
       for (const s of we.workout_sets) volume += s.reps * s.weight_kg;
     }
@@ -51,15 +51,15 @@ export async function guestFetchTotalVolume(): Promise<{ data: number; error: st
   return { data: volume, error: null };
 }
 
-export async function guestFetchWorkoutById(id: string): Promise<{ data: WorkoutWithExercises | null; error: string | null }> {
-  return { data: (await readWorkouts()).find((w) => w.id === id) ?? null, error: null };
+export async function smartUserFetchWorkoutById(userId: string, id: string): Promise<{ data: WorkoutWithExercises | null; error: string | null }> {
+  return { data: (await readWorkouts(userId)).find((w) => w.id === id) ?? null, error: null };
 }
 
-export async function guestFetchAllWorkoutsWithSets(): Promise<{
+export async function smartUserFetchAllWorkoutsWithSets(userId: string): Promise<{
   data: { id: string; completed_at: string; exerciseCount: number; setCount: number; volume: number; name: string }[] | null;
   error: string | null;
 }> {
-  const workouts = (await readWorkouts())
+  const workouts = (await readWorkouts(userId))
     .filter((w) => w.completed_at !== null)
     .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime());
   const mapped = workouts.map((w) => ({
@@ -73,7 +73,7 @@ export async function guestFetchAllWorkoutsWithSets(): Promise<{
   return { data: mapped, error: null };
 }
 
-export async function guestCreateWorkout(name: string, startedAt: string, entries: DraftExercise[]): Promise<{ data: { id: string } | null; error: string | null }> {
+export async function smartUserCreateWorkout(userId: string, name: string, startedAt: string, entries: DraftExercise[]): Promise<{ data: { id: string } | null; error: string | null }> {
   const validEntries = entries.filter((e) => e.sets.some((s) => s.reps !== '' && s.weight !== ''));
   if (validEntries.length === 0) return { data: null, error: 'No valid sets to save' };
 
@@ -105,57 +105,57 @@ export async function guestCreateWorkout(name: string, startedAt: string, entrie
 
   const workout: StoredWorkout = {
     id: workoutId, name, started_at: startedAt, completed_at: now, created_at: now,
-    account_id: 'guest', workout_exercises: workoutExercises,
+    account_id: userId, workout_exercises: workoutExercises,
   };
 
-  const existing = await readWorkouts();
+  const existing = await readWorkouts(userId);
   existing.push(workout);
-  await writeWorkouts(existing);
+  await writeWorkouts(userId, existing);
   return { data: { id: workoutId }, error: null };
 }
 
-export async function guestDeleteWorkout(id: string): Promise<{ error: string | null }> {
-  await writeWorkouts((await readWorkouts()).filter((w) => w.id !== id));
+export async function smartUserDeleteWorkout(userId: string, id: string): Promise<{ error: string | null }> {
+  await writeWorkouts(userId, (await readWorkouts(userId)).filter((w) => w.id !== id));
   return { error: null };
 }
 
 // -- Exercises --
 
-async function readCustomExercises(): Promise<Exercise[]> {
-  const raw = await AsyncStorage.getItem(EXERCISES_KEY);
+async function readCustomExercises(userId: string): Promise<Exercise[]> {
+  const raw = await AsyncStorage.getItem(exercisesKey(userId));
   if (!raw) return [];
   try { return JSON.parse(raw) as Exercise[]; } catch { return []; }
 }
 
-async function readArchivedIds(): Promise<Set<string>> {
-  const raw = await AsyncStorage.getItem(ARCHIVED_KEY);
+async function readArchivedIds(userId: string): Promise<Set<string>> {
+  const raw = await AsyncStorage.getItem(archivedKey(userId));
   if (!raw) return new Set();
   try { return new Set(JSON.parse(raw) as string[]); } catch { return new Set(); }
 }
 
-export async function guestFetchAllExercises(): Promise<{ data: Exercise[] | null; error: string | null }> {
-  const archived = await readArchivedIds();
-  const custom = await readCustomExercises();
+export async function smartUserFetchAllExercises(userId: string): Promise<{ data: Exercise[] | null; error: string | null }> {
+  const archived = await readArchivedIds(userId);
+  const custom = await readCustomExercises(userId);
   const all = [...SEED_EXERCISES, ...custom]
     .filter((e) => !archived.has(e.id))
     .sort((a, b) => a.muscle_group.localeCompare(b.muscle_group) || a.name.localeCompare(b.name));
   return { data: all, error: null };
 }
 
-export async function guestCreateExercise(name: string, muscleGroup: string): Promise<{ data: Exercise | null; error: string | null }> {
+export async function smartUserCreateExercise(userId: string, name: string, muscleGroup: string): Promise<{ data: Exercise | null; error: string | null }> {
   const exercise: Exercise = {
     id: Crypto.randomUUID(), name: name.trim(), muscle_group: muscleGroup,
     is_custom: true, archived_at: null, created_at: new Date().toISOString(),
   };
-  const existing = await readCustomExercises();
+  const existing = await readCustomExercises(userId);
   existing.push(exercise);
-  await AsyncStorage.setItem(EXERCISES_KEY, JSON.stringify(existing));
+  await AsyncStorage.setItem(exercisesKey(userId), JSON.stringify(existing));
   return { data: exercise, error: null };
 }
 
-export async function guestArchiveExercise(id: string): Promise<{ error: string | null }> {
-  const archived = await readArchivedIds();
+export async function smartUserArchiveExercise(userId: string, id: string): Promise<{ error: string | null }> {
+  const archived = await readArchivedIds(userId);
   archived.add(id);
-  await AsyncStorage.setItem(ARCHIVED_KEY, JSON.stringify([...archived]));
+  await AsyncStorage.setItem(archivedKey(userId), JSON.stringify([...archived]));
   return { error: null };
 }

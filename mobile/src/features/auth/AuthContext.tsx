@@ -139,16 +139,26 @@ export function AuthProviderComponent({ children }: { children: ReactNode }) {
   const loginWithSmartUser = useCallback(async (email: string, password: string): Promise<string | null> => {
     const { userId, error } = await suLogin(email, password);
     if (error || !userId) return error ?? 'Login failed';
+    const { valid, session: validSession } = await validateSmartUserSession();
+    if (!valid || !validSession) {
+      await suLogout();
+      return 'Session validation failed. Please try again.';
+    }
     await AsyncStorage.setItem(AUTH_MODE_KEY, 'smartuser');
-    setState({ user: { id: userId, email, displayName: null, provider: 'smartuser' }, loading: false, isGuest: false, provider: 'smartuser' });
+    setState({ user: { id: validSession.userId, email: validSession.email || email, displayName: null, provider: 'smartuser' }, loading: false, isGuest: false, provider: 'smartuser' });
     return null;
   }, []);
 
   const signupWithSmartUser = useCallback(async (email: string, password: string): Promise<string | null> => {
     const { userId, error } = await suSignup(email, password);
     if (error || !userId) return error ?? 'Signup failed';
+    const { valid, session: validSession } = await validateSmartUserSession();
+    if (!valid || !validSession) {
+      await suLogout();
+      return 'Session validation failed. Please try again.';
+    }
     await AsyncStorage.setItem(AUTH_MODE_KEY, 'smartuser');
-    setState({ user: { id: userId, email, displayName: null, provider: 'smartuser' }, loading: false, isGuest: false, provider: 'smartuser' });
+    setState({ user: { id: validSession.userId, email: validSession.email || email, displayName: null, provider: 'smartuser' }, loading: false, isGuest: false, provider: 'smartuser' });
     return null;
   }, []);
 

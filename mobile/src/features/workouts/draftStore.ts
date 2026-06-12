@@ -1,11 +1,19 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
+import { getActiveAccountIdentity } from '../../lib/identity';
 import type { WorkoutDraft, DraftExercise, DraftSet, Exercise } from '../../shared/types';
 
-const DRAFT_KEY = 'gymtrack.activeWorkoutDraft';
+async function getDraftKey(): Promise<string> {
+  const { provider, accountId } = await getActiveAccountIdentity();
+  if (provider === 'guest') return 'gymtrack.guest.activeWorkoutDraft';
+  if (provider === 'smartuser' && accountId) return `gymtrack.smartuser.${accountId}.activeWorkoutDraft`;
+  if (provider === 'supabase' && accountId) return `gymtrack.supabase.${accountId}.activeWorkoutDraft`;
+  return 'gymtrack.activeWorkoutDraft';
+}
 
 export async function loadDraft(): Promise<WorkoutDraft | null> {
-  const raw = await AsyncStorage.getItem(DRAFT_KEY);
+  const key = await getDraftKey();
+  const raw = await AsyncStorage.getItem(key);
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as WorkoutDraft;
@@ -14,11 +22,13 @@ export async function loadDraft(): Promise<WorkoutDraft | null> {
 }
 
 export async function saveDraft(draft: WorkoutDraft): Promise<void> {
-  await AsyncStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  const key = await getDraftKey();
+  await AsyncStorage.setItem(key, JSON.stringify(draft));
 }
 
 export async function clearDraft(): Promise<void> {
-  await AsyncStorage.removeItem(DRAFT_KEY);
+  const key = await getDraftKey();
+  await AsyncStorage.removeItem(key);
 }
 
 export function createEmptyDraft(): WorkoutDraft {

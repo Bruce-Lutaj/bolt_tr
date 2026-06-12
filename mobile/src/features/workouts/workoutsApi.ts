@@ -1,19 +1,24 @@
 import { supabase } from '../../lib/supabase';
+import { getActiveAccountIdentity } from '../../lib/identity';
 import {
-  isGuestMode, guestFetchRecentWorkouts, guestFetchTotalWorkoutCount,
+  guestFetchRecentWorkouts, guestFetchTotalWorkoutCount,
   guestFetchWeeklyWorkoutCount, guestFetchTotalVolume, guestFetchWorkoutById,
   guestFetchAllWorkoutsWithSets, guestCreateWorkout, guestDeleteWorkout,
 } from '../guest/guestStore';
+import {
+  smartUserFetchRecentWorkouts, smartUserFetchTotalWorkoutCount,
+  smartUserFetchWeeklyWorkoutCount, smartUserFetchTotalVolume, smartUserFetchWorkoutById,
+  smartUserFetchAllWorkoutsWithSets, smartUserCreateWorkout, smartUserDeleteWorkout,
+} from '../smartuser/smartUserStore';
 import type { Workout, WorkoutWithExercises, DraftExercise } from '../../shared/types';
 
-async function getCurrentUserId(): Promise<string | null> {
-  const { data: { session } } = await supabase.auth.getSession();
-  return session?.user?.id ?? null;
-}
-
 export async function fetchRecentWorkouts(limit = 3): Promise<{ data: Workout[] | null; error: string | null }> {
-  if (await isGuestMode()) return guestFetchRecentWorkouts(limit);
-  const accountId = await getCurrentUserId();
+  const { provider, accountId } = await getActiveAccountIdentity();
+  if (provider === 'guest') return guestFetchRecentWorkouts(limit);
+  if (provider === 'smartuser') {
+    if (!accountId) return { data: null, error: 'Not authenticated' };
+    return smartUserFetchRecentWorkouts(accountId, limit);
+  }
   if (!accountId) return { data: null, error: 'Not authenticated' };
   const { data, error } = await supabase.from('workouts').select('*')
     .eq('account_id', accountId).not('completed_at', 'is', null)
@@ -22,8 +27,12 @@ export async function fetchRecentWorkouts(limit = 3): Promise<{ data: Workout[] 
 }
 
 export async function fetchTotalWorkoutCount(): Promise<{ data: number; error: string | null }> {
-  if (await isGuestMode()) return guestFetchTotalWorkoutCount();
-  const accountId = await getCurrentUserId();
+  const { provider, accountId } = await getActiveAccountIdentity();
+  if (provider === 'guest') return guestFetchTotalWorkoutCount();
+  if (provider === 'smartuser') {
+    if (!accountId) return { data: 0, error: 'Not authenticated' };
+    return smartUserFetchTotalWorkoutCount(accountId);
+  }
   if (!accountId) return { data: 0, error: 'Not authenticated' };
   const { count, error } = await supabase.from('workouts').select('id', { count: 'exact', head: true })
     .eq('account_id', accountId).not('completed_at', 'is', null);
@@ -31,8 +40,12 @@ export async function fetchTotalWorkoutCount(): Promise<{ data: number; error: s
 }
 
 export async function fetchWeeklyWorkoutCount(): Promise<{ data: number; error: string | null }> {
-  if (await isGuestMode()) return guestFetchWeeklyWorkoutCount();
-  const accountId = await getCurrentUserId();
+  const { provider, accountId } = await getActiveAccountIdentity();
+  if (provider === 'guest') return guestFetchWeeklyWorkoutCount();
+  if (provider === 'smartuser') {
+    if (!accountId) return { data: 0, error: 'Not authenticated' };
+    return smartUserFetchWeeklyWorkoutCount(accountId);
+  }
   if (!accountId) return { data: 0, error: 'Not authenticated' };
   const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
   const { count, error } = await supabase.from('workouts').select('id', { count: 'exact', head: true })
@@ -41,8 +54,12 @@ export async function fetchWeeklyWorkoutCount(): Promise<{ data: number; error: 
 }
 
 export async function fetchTotalVolume(): Promise<{ data: number; error: string | null }> {
-  if (await isGuestMode()) return guestFetchTotalVolume();
-  const accountId = await getCurrentUserId();
+  const { provider, accountId } = await getActiveAccountIdentity();
+  if (provider === 'guest') return guestFetchTotalVolume();
+  if (provider === 'smartuser') {
+    if (!accountId) return { data: 0, error: 'Not authenticated' };
+    return smartUserFetchTotalVolume(accountId);
+  }
   if (!accountId) return { data: 0, error: 'Not authenticated' };
   const { data, error } = await supabase.from('workout_sets').select('reps, weight_kg');
   if (error) return { data: 0, error: error.message };
@@ -51,8 +68,12 @@ export async function fetchTotalVolume(): Promise<{ data: number; error: string 
 }
 
 export async function fetchWorkoutById(id: string): Promise<{ data: WorkoutWithExercises | null; error: string | null }> {
-  if (await isGuestMode()) return guestFetchWorkoutById(id);
-  const accountId = await getCurrentUserId();
+  const { provider, accountId } = await getActiveAccountIdentity();
+  if (provider === 'guest') return guestFetchWorkoutById(id);
+  if (provider === 'smartuser') {
+    if (!accountId) return { data: null, error: 'Not authenticated' };
+    return smartUserFetchWorkoutById(accountId, id);
+  }
   if (!accountId) return { data: null, error: 'Not authenticated' };
   const { data, error } = await supabase.from('workouts')
     .select('*, workout_exercises(*, workout_sets(*))')
@@ -64,8 +85,12 @@ export async function fetchAllWorkoutsWithSets(): Promise<{
   data: { id: string; completed_at: string; exerciseCount: number; setCount: number; volume: number; name: string }[] | null;
   error: string | null;
 }> {
-  if (await isGuestMode()) return guestFetchAllWorkoutsWithSets();
-  const accountId = await getCurrentUserId();
+  const { provider, accountId } = await getActiveAccountIdentity();
+  if (provider === 'guest') return guestFetchAllWorkoutsWithSets();
+  if (provider === 'smartuser') {
+    if (!accountId) return { data: null, error: 'Not authenticated' };
+    return smartUserFetchAllWorkoutsWithSets(accountId);
+  }
   if (!accountId) return { data: null, error: 'Not authenticated' };
   const { data, error } = await supabase.from('workouts')
     .select('*, workout_exercises(id, workout_sets(reps, weight_kg))')
@@ -85,11 +110,15 @@ export async function fetchAllWorkoutsWithSets(): Promise<{
 }
 
 export async function createWorkout(name: string, startedAt: string, entries: DraftExercise[]): Promise<{ data: { id: string } | null; error: string | null }> {
-  if (await isGuestMode()) return guestCreateWorkout(name, startedAt, entries);
+  const { provider, accountId } = await getActiveAccountIdentity();
+  if (provider === 'guest') return guestCreateWorkout(name, startedAt, entries);
+  if (provider === 'smartuser') {
+    if (!accountId) return { data: null, error: 'Not authenticated' };
+    return smartUserCreateWorkout(accountId, name, startedAt, entries);
+  }
+
   const validEntries = entries.filter((e) => e.sets.some((s) => s.reps !== '' && s.weight !== ''));
   if (validEntries.length === 0) return { data: null, error: 'No valid sets to save' };
-
-  const accountId = await getCurrentUserId();
   if (!accountId) return { data: null, error: 'Not authenticated' };
 
   const now = new Date().toISOString();
@@ -128,8 +157,12 @@ export async function createWorkout(name: string, startedAt: string, entries: Dr
 }
 
 export async function deleteWorkout(id: string): Promise<{ error: string | null }> {
-  if (await isGuestMode()) return guestDeleteWorkout(id);
-  const accountId = await getCurrentUserId();
+  const { provider, accountId } = await getActiveAccountIdentity();
+  if (provider === 'guest') return guestDeleteWorkout(id);
+  if (provider === 'smartuser') {
+    if (!accountId) return { error: 'Not authenticated' };
+    return smartUserDeleteWorkout(accountId, id);
+  }
   if (!accountId) return { error: 'Not authenticated' };
   const { error } = await supabase.from('workouts').delete().eq('id', id).eq('account_id', accountId);
   return { error: error?.message ?? null };

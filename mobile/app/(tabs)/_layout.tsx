@@ -1,8 +1,16 @@
 import React from 'react';
-import { Tabs } from 'expo-router';
-import { View, Text, Platform } from 'react-native';
+import { Tabs, Redirect } from 'expo-router';
+import { Platform } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../src/features/auth/AuthContext';
+import { LoadingScreen } from '../../src/components/Feedback';
 
 export default function TabsLayout() {
+  const { user, loading } = useAuth();
+
+  if (loading) return <LoadingScreen />;
+  if (!user) return <Redirect href="/auth/sign-in" />;
+
   return (
     <Tabs
       screenOptions={{
@@ -11,92 +19,41 @@ export default function TabsLayout() {
           backgroundColor: '#1e293b',
           borderTopColor: '#334155',
           borderTopWidth: 1,
-          height: Platform.OS === 'android' ? 84 : 84,
+          height: Platform.OS === 'android' ? 68 : 84,
           paddingTop: 8,
           paddingBottom: Platform.OS === 'ios' ? 28 : 8,
         },
         tabBarActiveTintColor: '#22c55e',
         tabBarInactiveTintColor: '#64748b',
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}
     >
       <Tabs.Screen
         name="today"
         options={{
           tabBarLabel: 'Today',
-          tabBarIcon: ({ color }) => (
-            <View
-              style={{
-                width: 32,
-                height: 32,
-                justifyContent: 'center',
-                alignItems: 'center',
-                backgroundColor: 'transparent',
-              }}
-            >
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color }}>T</Text>
-            </View>
-          ),
+          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="workouts"
         options={{
           tabBarLabel: 'Workout',
-          tabBarIcon: ({ color }) => (
-            <View
-              style={{
-                width: 32,
-                height: 32,
-                justifyContent: 'center',
-                alignItems: 'center',
-                backgroundColor: 'transparent',
-              }}
-            >
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color }}>W</Text>
-            </View>
-          ),
+          tabBarIcon: ({ color, size }) => <Ionicons name="barbell-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="history"
         options={{
           tabBarLabel: 'History',
-          tabBarIcon: ({ color }) => (
-            <View
-              style={{
-                width: 32,
-                height: 32,
-                justifyContent: 'center',
-                alignItems: 'center',
-                backgroundColor: 'transparent',
-              }}
-            >
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color }}>H</Text>
-            </View>
-          ),
+          tabBarIcon: ({ color, size }) => <Ionicons name="time-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           tabBarLabel: 'Profile',
-          tabBarIcon: ({ color }) => (
-            <View
-              style={{
-                width: 32,
-                height: 32,
-                justifyContent: 'center',
-                alignItems: 'center',
-                backgroundColor: 'transparent',
-              }}
-            >
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color }}>P</Text>
-            </View>
-          ),
+          tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} />,
         }}
       />
     </Tabs>
