@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "GymTrack",
+    "slug": "gymtrack-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "gymtrack",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "com.gymtrack.mobile",
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.gymtrack.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ]
+  }
+}
